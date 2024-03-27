@@ -1,13 +1,25 @@
 [project]
 name = "chessticulate-api"
-version = "0.1.0"
+version = "0.2.0"
 requires-python = ">=3.9"
-dependencies = ["fastapi", "sqlalchemy", "httpx"]
+dependencies = ["fastapi[all]", "sqlalchemy >= 2", "httpx", "python-dotenv", "py-bcrypt", "pyjwt", "asyncpg"]
 
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
-dev = ["black", "pylint", "pytest"]
+dev = ["black", "pylint", "pytest", "pytest-asyncio", "pytest-cov", "isort", "aiosqlite"]
 
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line_length = 88
+preview = true  # format long strings
+
+[tool.pylint]
+max-line-length = 88
+
+[tool.pytest.ini_options]
+addopts = "--cov=chessticulate_api"
