@@ -70,7 +70,7 @@ async def move(
     """Attempt a move on a given game"""
 
     user_id = credentials["user_id"]
-    games = await crud.get_games(id_=game_id)
+    games = await crud.get_games(id_=int(game_id))
 
     if not games:
         raise HTTPException(status_code=404, detail="invalid game id")
