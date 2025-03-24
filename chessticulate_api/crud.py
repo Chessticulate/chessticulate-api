@@ -7,8 +7,9 @@ import bcrypt
 import jwt
 from pydantic import SecretStr
 from sqlalchemy import or_, select, update
+from sqlalchemy.sql import func
 from sqlalchemy.orm import aliased
-
+from sqlalchemy.dialects.postgresql import ARRAY
 from chessticulate_api import db, models
 from chessticulate_api.config import CONFIG
 
@@ -308,6 +309,7 @@ async def get_games(
             )
             .join(user_temp1, models.Game.white == user_temp1.id_)
             .join(user_temp2, models.Game.black == user_temp2.id_)
+            
         )
 
         # if player_id is included in request,
@@ -330,9 +332,11 @@ async def get_games(
 
         stmt = stmt.offset(skip).limit(limit)
 
+        
+
         result = (await session.execute(stmt)).all()
 
-        return [
+        games = [
             {
                 "game": game,
                 "white_username": white_username,
@@ -340,6 +344,14 @@ async def get_games(
             }
             for game, white_username, black_username in result
         ]
+
+        # Fetch moves separately
+        for g in games:
+            move_stmt = select(models.Move.movestr).where(models.Move.game_id == g["game"].id_)
+            moves = (await session.execute(move_stmt)).scalars().all()
+            g["move_hist"] = moves
+
+        return games
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
