@@ -7,9 +7,8 @@ import bcrypt
 import jwt
 from pydantic import SecretStr
 from sqlalchemy import or_, select, update
-from sqlalchemy.sql import func
 from sqlalchemy.orm import aliased
-from sqlalchemy.dialects.postgresql import ARRAY
+
 from chessticulate_api import db, models
 from chessticulate_api.config import CONFIG
 
@@ -276,7 +275,7 @@ async def decline_invitation(id_: int) -> bool:
         await session.commit()
         return result.rowcount == 1
 
-
+# pylint: disable=too-many-locals
 async def get_games(
     *,
     skip: int = 0,
@@ -309,7 +308,6 @@ async def get_games(
             )
             .join(user_temp1, models.Game.white == user_temp1.id_)
             .join(user_temp2, models.Game.black == user_temp2.id_)
-            
         )
 
         # if player_id is included in request,
@@ -332,8 +330,6 @@ async def get_games(
 
         stmt = stmt.offset(skip).limit(limit)
 
-        
-
         result = (await session.execute(stmt)).all()
 
         games = [
@@ -347,7 +343,9 @@ async def get_games(
 
         # Fetch moves separately
         for g in games:
-            move_stmt = select(models.Move.movestr).where(models.Move.game_id == g["game"].id_)
+            move_stmt = select(models.Move.movestr).where(
+                models.Move.game_id == g["game"].id_
+            )
             moves = (await session.execute(move_stmt)).scalars().all()
             g["move_hist"] = moves
 

@@ -765,6 +765,24 @@ class TestGetMoves:
         assert response.status_code == 200
         assert len(response.json()) == 1
 
+    @pytest.mark.asyncio
+    async def test_do_move_successful(self, token, restore_fake_data_after):
+        with respx.mock:
+            respx.post(CONFIG.workers_base_url).mock(
+                return_value=Response(
+                    200, json={"status": "MOVEOK", "fen": "abcdefg", "states": "{}"}
+                )
+            )
+
+            response = await client.post(
+                "/games/1/move",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"move": "e4"},
+            )
+
+            assert response.status_code == 200
+            print(response.json())
+
 
 class TestForfeit:
 
