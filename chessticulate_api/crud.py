@@ -275,6 +275,7 @@ async def decline_invitation(id_: int) -> bool:
         await session.commit()
         return result.rowcount == 1
 
+
 # pylint: disable=too-many-locals
 async def get_games(
     *,
