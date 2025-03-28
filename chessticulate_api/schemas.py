@@ -164,6 +164,7 @@ class GetGameResponse(BaseModel):
     white_username: str
     black_username: str
     whomst: int
+    move_hist: list[str]
     is_active: bool
     result: str | None = None
     winner: int | None = None
@@ -199,25 +200,6 @@ class DoMoveResponse(BaseModel):
     result: str | None = None
     winner: int | None = None
     fen: str
-
-
-class GetMovesResponse(BaseModel):
-    """Pydantic model for get move responses"""
-
-    id_: int = Field(
-        ..., validation_alias=AliasChoices("id_", "id"), serialization_alias="id"
-    )
-    user_id: int
-    game_id: int
-    timestamp: datetime | None = None
-    movestr: str
-    fen: str
-
-
-class GetMovesListResponse(RootModel):
-    """Pydantic model for returning a list of GetMovesResponses"""
-
-    root: list[GetMovesResponse]
 
 
 class ForfeitResponse(BaseModel):

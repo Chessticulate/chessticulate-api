@@ -736,52 +736,14 @@ class TestMove:
 
 class TestGetMoves:
     @pytest.mark.asyncio
-    async def test_get_moves_no_params(self, token):
+    async def test_moves_returned_with_game(self, token):
         response = await client.get(
-            "/moves",
+            "/games",
             headers={"Authorization": f"Bearer {token}"},
         )
 
         assert response.status_code == 200
-        assert len(response.json()) == 3
-
-    @pytest.mark.asyncio
-    async def test_get_moves_with_move_id(self, token):
-        response = await client.get(
-            "/moves?move_id=3",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        assert response.status_code == 200
-        assert len(response.json()) == 1
-
-    @pytest.mark.asyncio
-    async def test_get_moves_with_game_and_user_id(self, token):
-        response = await client.get(
-            "/moves?game_id=3&user_id=2",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        assert response.status_code == 200
-        assert len(response.json()) == 1
-
-    @pytest.mark.asyncio
-    async def test_do_move_successful(self, token, restore_fake_data_after):
-        with respx.mock:
-            respx.post(CONFIG.workers_base_url).mock(
-                return_value=Response(
-                    200, json={"status": "MOVEOK", "fen": "abcdefg", "states": "{}"}
-                )
-            )
-
-            response = await client.post(
-                "/games/1/move",
-                headers={"Authorization": f"Bearer {token}"},
-                json={"move": "e4"},
-            )
-
-            assert response.status_code == 200
-            print(response.json())
+        assert response.json()[0]["move_hist"] == ["e4"]
 
 
 class TestForfeit:
