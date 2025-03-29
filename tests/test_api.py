@@ -571,6 +571,7 @@ class TestGetGames:
         assert json_obj[0]["white"] == 1
         assert json_obj[0]["black"] == 2
         assert json_obj[0]["whomst"] == 1
+        assert json_obj[0]["move_hist"] == ["e4"]
         assert json_obj[0]["white_username"] == "fakeuser1"
         assert json_obj[0]["black_username"] == "fakeuser2"
 
@@ -732,18 +733,6 @@ class TestMove:
             assert response.json()["result"] == "CHECKMATE"
             assert response.json()["last_active"] != None
             assert response.json()["winner"] == 1
-
-
-class TestGetMoves:
-    @pytest.mark.asyncio
-    async def test_moves_returned_with_game(self, token):
-        response = await client.get(
-            "/games",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        assert response.status_code == 200
-        assert response.json()[0]["move_hist"] == ["e4"]
 
 
 class TestForfeit:

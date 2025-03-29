@@ -284,7 +284,7 @@ async def get_games(
     order_by: str = "last_active",
     reverse: bool = False,
     **kwargs,
-) -> list[tuple[models.Game, str, str]]:
+) -> list[dict[str, models.Game | str | list[str]]]:
     """
     Retrieve a list of games from DB.
 
