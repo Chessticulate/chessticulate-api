@@ -54,6 +54,7 @@ async def get_games(
             **vars(game_data["game"]),
             "white_username": game_data["white_username"],
             "black_username": game_data["black_username"],
+            "move_hist": game_data["move_hist"],
         }
         for game_data in games
     ]

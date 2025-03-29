@@ -276,6 +276,7 @@ async def decline_invitation(id_: int) -> bool:
         return result.rowcount == 1
 
 
+# pylint: disable=too-many-locals
 async def get_games(
     *,
     skip: int = 0,
@@ -283,7 +284,7 @@ async def get_games(
     order_by: str = "last_active",
     reverse: bool = False,
     **kwargs,
-) -> list[tuple[models.Game, str, str]]:
+) -> list[dict[str, models.Game | str | list[str]]]:
     """
     Retrieve a list of games from DB.
 
@@ -332,7 +333,7 @@ async def get_games(
 
         result = (await session.execute(stmt)).all()
 
-        return [
+        games = [
             {
                 "game": game,
                 "white_username": white_username,
@@ -340,6 +341,16 @@ async def get_games(
             }
             for game, white_username, black_username in result
         ]
+
+        # Fetch moves separately
+        for g in games:
+            move_stmt = select(models.Move.movestr).where(
+                models.Move.game_id == g["game"].id_
+            )
+            moves = (await session.execute(move_stmt)).scalars().all()
+            g["move_hist"] = moves
+
+        return games
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments

@@ -351,6 +351,11 @@ class TestGetGames:
         assert games[1]["game"].whomst == 2
         assert games[2]["game"].whomst == 1
 
+    @pytest.mark.asyncio
+    async def test_get_games_succeeds_move_hist(self):
+        games = await crud.get_games(id_=1)
+        assert games[0]["move_hist"] == ["e4"]
+
 
 class TestDoMove:
     @pytest.mark.parametrize(

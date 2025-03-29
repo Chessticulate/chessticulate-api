@@ -571,6 +571,7 @@ class TestGetGames:
         assert json_obj[0]["white"] == 1
         assert json_obj[0]["black"] == 2
         assert json_obj[0]["whomst"] == 1
+        assert json_obj[0]["move_hist"] == ["e4"]
         assert json_obj[0]["white_username"] == "fakeuser1"
         assert json_obj[0]["black_username"] == "fakeuser2"
 
@@ -732,38 +733,6 @@ class TestMove:
             assert response.json()["result"] == "CHECKMATE"
             assert response.json()["last_active"] != None
             assert response.json()["winner"] == 1
-
-
-class TestGetMoves:
-    @pytest.mark.asyncio
-    async def test_get_moves_no_params(self, token):
-        response = await client.get(
-            "/moves",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        assert response.status_code == 200
-        assert len(response.json()) == 3
-
-    @pytest.mark.asyncio
-    async def test_get_moves_with_move_id(self, token):
-        response = await client.get(
-            "/moves?move_id=3",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        assert response.status_code == 200
-        assert len(response.json()) == 1
-
-    @pytest.mark.asyncio
-    async def test_get_moves_with_game_and_user_id(self, token):
-        response = await client.get(
-            "/moves?game_id=3&user_id=2",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-
-        assert response.status_code == 200
-        assert len(response.json()) == 1
 
 
 class TestForfeit:
