@@ -1,6 +1,7 @@
 """chessticulate_api.config"""
 
 import os
+import json
 
 from dotenv import load_dotenv
 
@@ -14,6 +15,9 @@ class CONFIG:  # pylint: disable=too-few-public-methods
     app_host: str = os.environ.get("APP_HOST", "localhost")
     app_port: int = int(os.environ.get("APP_PORT", 8000))
     log_level: str = os.environ.get("LOG_LEVEL", "info")
+    cors_origins: list[str] = json.loads(
+        os.environ.get("CORS_ORIGINS", '["https://chess.brgdev.xyz"]')
+    )
 
     # "postgresql+asyncpg://<uname>:<pswd>@<hostname>/<dbname>
     sql_conn_str: str = os.environ.get("SQL_CONN_STR", "sqlite+aiosqlite:///:memory:")
