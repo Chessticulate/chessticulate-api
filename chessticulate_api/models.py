@@ -51,7 +51,7 @@ class User(Base):  # pylint: disable=too-few-public-methods
     __tablename__ = "users"
 
     id_: Mapped[int] = mapped_column("id", primary_key=True)
-    name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     password: Mapped[str] = mapped_column(String, nullable=True)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=True)
     deleted: Mapped[bool] = mapped_column(
@@ -87,6 +87,23 @@ class Invitation(Base):  # pylint: disable=too-few-public-methods
         nullable=False,
         server_default=InvitationStatus.PENDING.value,
     )
+
+
+class ChallengeRequest(Base):  # pylint: disable=too-few-public-methods
+    """Invitation SQL Model"""
+
+    __tablename__ = "challenge_requests"
+
+    id_: Mapped[int] = mapped_column("id", primary_key=True)
+    requestor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    date_created: Mapped[str] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),  # pylint: disable=not-callable
+    )
+    date_fulfilled: Mapped[str] = mapped_column(DateTime, nullable=True)
+    fulfilled_by: Mapped[int] = mapped_column(ForeignKey(""), nullable=True)
+    game_type: Mapped[str] = mapped_column(Enum(GameType), nullable=False)
 
 
 class Game(Base):  # pylint: disable=too-few-public-methods
