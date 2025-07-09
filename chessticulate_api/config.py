@@ -1,7 +1,7 @@
 """chessticulate_api.config"""
 
-import os
 import json
+import os
 
 from dotenv import load_dotenv
 
