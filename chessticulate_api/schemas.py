@@ -61,6 +61,15 @@ class GetInvitationResponse(BaseModel):
     status: str
 
 
+class CreateChallengeRequestRequest(BaseModel):
+    """Pydantic model for challenge request creation."""
+
+    to_id: int
+    game_type: GameTypeEnum = GameTypeEnum.CHESS
+
+    model_config = {"use_enum_values": True}
+
+
 class LoginRequest(BaseModel):
     """pydantic Model fro Login Requests"""
 

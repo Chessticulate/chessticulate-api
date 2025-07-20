@@ -22,12 +22,29 @@ class GameType(enum.Enum):
 
 
 class InvitationStatus(enum.StrEnum):
-    """Invitation Response Enum"""
+    """Invitation Status Enum"""
 
     ACCEPTED = "ACCEPTED"
     DECLINED = "DECLINED"
     PENDING = "PENDING"
     CANCELLED = "CANCELLED"
+
+
+class ChallengeRequestStatus(enum.StrEnum):
+    """Challenge Request Status Enum"""
+
+    ACCEPTED = "ACCEPTED"
+    DECLINED = "DECLINED"
+    PENDING = "PENDING"
+    CANCELLED = "CANCELLED"
+
+
+class ChallengeResponseStatus(enum.StrEnum):
+    """Challenge Response Status Enum"""
+
+    ACCEPTED = "ACCEPTED"
+    DECLINED = "DECLINED"
+    PENDING = "PENDING"
 
 
 class GameResult(enum.StrEnum):
@@ -90,20 +107,46 @@ class Invitation(Base):  # pylint: disable=too-few-public-methods
 
 
 class ChallengeRequest(Base):  # pylint: disable=too-few-public-methods
-    """Invitation SQL Model"""
+    """Challenge Request SQL Model"""
 
     __tablename__ = "challenge_requests"
 
     id_: Mapped[int] = mapped_column("id", primary_key=True)
-    requestor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    date_created: Mapped[str] = mapped_column(
+    requester_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    date_requested: Mapped[str] = mapped_column(
         DateTime,
         nullable=False,
         server_default=func.now(),  # pylint: disable=not-callable
     )
-    date_fulfilled: Mapped[str] = mapped_column(DateTime, nullable=True)
-    fulfilled_by: Mapped[int] = mapped_column(ForeignKey(""), nullable=True)
     game_type: Mapped[str] = mapped_column(Enum(GameType), nullable=False)
+    status: Mapped[str] = mapped_column(
+        Enum(ChallengeRequestStatus),
+        nullable=False,
+        server_default=ChallengeRequestStatus.PENDING.value,
+    )
+    fulfilled_by: Mapped[int] = mapped_column(ForeignKey("challenge_responses.id"), nullable=True)
+    game_id: Mapped[int] = mapped_column(ForeignKey("games.id"), nullable=True)
+
+
+class ChallengeResponse(Base):  # pylint: disable=too-few-public-methods
+    """Challenge Response SQL Model"""
+
+    __tablename__ = "challenge_responses"
+
+    id_: Mapped[int] = mapped_column("id", primary_key=True)
+    submitter_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    request_id: Mapped[int] = mapped_column(ForeignKey("challenge_requests.id"), nullable=False)
+    date_submitted: Mapped[str] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),  # pylint: disable=not-callable
+    )
+    status: Mapped[str] = mapped_column(
+        Enum(ChallengeResponseStatus),
+        nullable=False,
+        server_default=ChallengeResponseStatus.PENDING.value,
+    )
+    game_id: Mapped[int] = mapped_column(ForeignKey("games.id"), nullable=True)
 
 
 class Game(Base):  # pylint: disable=too-few-public-methods
