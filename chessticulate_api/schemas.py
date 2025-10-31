@@ -177,6 +177,15 @@ class GetGamesListResponse(RootModel):
     root: list[GetGameResponse]
 
 
+class GameUpdateResponse(BaseModel):
+    game_id: int = Field(..., serialization_alias="gameId")
+    uci: str          # "e2e4"
+    fen: str          # Updated FEN
+    by: int           # user_id who moved
+    whomst: int       # next to move
+    status: str | None = None
+
+
 class DoMoveRequest(BaseModel):
     """Pydantic model for move endpoint request"""
 

@@ -1,14 +1,44 @@
 """chessticulate_api.routers.game"""
 
+import asyncio
 import json
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import Field
 
 from chessticulate_api import crud, schemas, security, workers_service
 
 game_router = APIRouter(prefix="/games")
+
+# SUBS: game_id -> set of per-connection queues (one queue per SSE connection)
+SUBS: dict[int, set[asyncio.Queue[str]]] = {}
+
+def subs(game_id: int) -> set[asyncio.Queue[str]]:
+    return SUBS.setdefault(game_id, set())
+
+
+# Async generator used by the SSE endpoint
+async def game_stream(request: Request, game_id: int, q: asyncio.Queue[str]):
+    yield ": connected\n\n"
+    try:
+        while True:
+            try:
+                msg = await asyncio.wait_for(q.get(), timeout=20.0)
+                yield f"data: {msg}\n\n"
+            except asyncio.TimeoutError:
+                # heartbeat to keep proxies from closing the connection
+                yield ": ping\n\n"
+
+            if await request.is_disconnected():
+                break
+    finally:
+        s = SUBS.get(game_id)
+        if s:
+            s.discard(q)
+            if not s:
+                SUBS.pop(game_id, None)
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
@@ -101,6 +131,7 @@ async def move(
     states = response["states"]
     fen = response["fen"]
     whomst = game.white if game.whomst == game.black else game.black
+
     updated_game = await crud.do_move(
         game_id,
         user_id,
@@ -110,9 +141,38 @@ async def move(
         fen,
         status,
     )
+    
+    # Broadcast to subscribers if any
+    event = json.dumps({
+        "type": "move",
+        "gameId": game_id,
+        "move": payload.move,
+        "fen": fen,
+        "status": status,
+        "whomst": whomst,
+    })
+    for q in list(SUBS.get(game_id, ())):
+        asyncio.create_task(q.put(event))
 
     return vars(updated_game)
 
+
+# whenever a move is performed, this function is called
+# the front end will hit this "long get" and once it has it will recieve game updates
+@game_router.get("/{game_id}/update")
+async def game_update(request: Request, game_id: int) -> schemas.GameUpdateResponse:
+    """recieve live updates from games"""
+
+    q: asyncio.Queue[str] = asyncio.Queue()
+    s = subs(game_id)
+    s.add(q)
+
+    headers = {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+    }
+    return StreamingResponse(game_stream(request, game_id, q), headers=headers)
 
 @game_router.post("/{game_id}/forfeit")
 async def forfeit(
