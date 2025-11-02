@@ -13,7 +13,7 @@ challenge_router = APIRouter(prefix="/challenges")
 @challenge_router.post("", status_code=201)
 async def create_challenge(
     credentials: Annotated[dict, Depends(security.get_credentials)],
-    payload: schemas.CreateChallenegeRequestRequest,
+    payload: schemas.CreateChallengeRequestRequest,
 ) -> schemas.CreateInvitationResponse:
     """Create a new challenge request."""
     if credentials["user_id"] == payload.to_id:

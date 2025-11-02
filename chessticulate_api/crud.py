@@ -145,7 +145,7 @@ async def create_invitation(
 
 async def get_invitations(
     *, skip: int = 0, limit: int = 10, reverse: bool = False, **kwargs
-) -> list[tuple[models.Invitation, str, str]]:
+) -> list[dict[str, models.Invitation | str]]:
     """
     Retrieve a list of invitations from DB.
 
@@ -417,25 +417,6 @@ async def do_move(
         ).one()[0]
 
 
-async def get_moves(
-    *, skip: int = 0, limit: int = 10, reverse: bool = False, **kwargs
-) -> list[models.Move]:
-    """Get move(s) from database"""
-
-    async with db.async_session() as session:
-        stmt = select(models.Move)
-        for k, v in kwargs.items():
-            stmt = stmt.where(getattr(models.Move, k) == v)
-
-        if reverse:
-            stmt = stmt.order_by(models.Move.timestamp.desc())
-        else:
-            stmt = stmt.order_by(models.Move.timestamp.asc())
-
-        stmt = stmt.offset(skip).limit(limit)
-        return [row[0] for row in (await session.execute(stmt)).all()]
-
-
 async def forfeit(id_: int, user_id: int) -> models.Game:
     """Forefeit game"""
 
@@ -463,3 +444,40 @@ async def forfeit(id_: int, user_id: int) -> models.Game:
         return (
             await session.execute(select(models.Game).where(models.Game.id_ == id_))
         ).one()[0]
+
+
+async def create_challenge_request(user_id: int):
+    async with db.async_session() as session:
+        session.add(models.ChallengeRequest(requester_id=user_id))
+        await session.commit()
+
+
+async def create_challenge_request(user_id: int):
+    async with db.async_session() as session:
+        session.add(models.ChallengeRequest(requester_id=user_id))
+        await session.commit()
+
+
+async def get_challenges(
+    *,
+    skip: int = 0,
+    limit: int = 10,
+    order_by: str = "created_at",
+    reverse: bool = False,
+    **kwargs
+) -> list[models.ChallengeRequest]:
+    async with db.async_session() as session:
+        stmt = select(models.ChallengeRequest)
+        for k, v in kwargs.items():
+            stmt = stmt.where(getattr(models.ChallengeRequest, k) == v)
+
+        order_by_attr = getattr(models.User, order_by)
+        if reverse:
+            order_by_attr = order_by_attr.desc()
+        else:
+            order_by_attr = order_by_attr.asc()
+        stmt = stmt.order_by(order_by_attr)
+
+        stmt = stmt.offset(skip).limit(limit)
+        return [row[0] for row in (await session.execute(stmt)).all()]
+

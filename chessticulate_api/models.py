@@ -113,12 +113,12 @@ class ChallengeRequest(Base):  # pylint: disable=too-few-public-methods
 
     id_: Mapped[int] = mapped_column("id", primary_key=True)
     requester_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    date_requested: Mapped[str] = mapped_column(
+    created_at: Mapped[str] = mapped_column(
         DateTime,
         nullable=False,
         server_default=func.now(),  # pylint: disable=not-callable
     )
-    game_type: Mapped[str] = mapped_column(Enum(GameType), nullable=False)
+    game_type: Mapped[str] = mapped_column(Enum(GameType), nullable=False, server_default=GameType.CHESS.value)
     status: Mapped[str] = mapped_column(
         Enum(ChallengeRequestStatus),
         nullable=False,
@@ -136,7 +136,7 @@ class ChallengeResponse(Base):  # pylint: disable=too-few-public-methods
     id_: Mapped[int] = mapped_column("id", primary_key=True)
     submitter_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     request_id: Mapped[int] = mapped_column(ForeignKey("challenge_requests.id"), nullable=False)
-    date_submitted: Mapped[str] = mapped_column(
+    created_at: Mapped[str] = mapped_column(
         DateTime,
         nullable=False,
         server_default=func.now(),  # pylint: disable=not-callable
