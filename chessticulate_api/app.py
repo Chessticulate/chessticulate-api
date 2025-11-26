@@ -7,7 +7,6 @@ import sqlalchemy
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
-
 from redis.asyncio import Redis
 
 from chessticulate_api import crud, models, routers, schemas
@@ -15,20 +14,20 @@ from chessticulate_api.config import CONFIG
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app_: FastAPI):
     """Setup DB and Redis"""
     await models.init_db()
 
     redis_url = getattr(CONFIG, "redis_url", "redis://localhost:6379/0")
-    app.state.redis: Redis = Redis.from_url(
+    app_.state.redis: Redis = Redis.from_url(
         redis_url,
         decode_responses=True,
     )
-    
+
     try:
         yield
     finally:
-        await app.state.redis.close()
+        await app.state.redis.aclose()
 
 
 app = FastAPI(
