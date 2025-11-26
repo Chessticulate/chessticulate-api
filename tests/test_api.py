@@ -8,9 +8,12 @@ from fastapi import FastAPI, HTTPException
 from httpx import ASGITransport, AsyncClient, Response
 
 from chessticulate_api import app, crud
-from chessticulate_api.config import CONFIG
 from chessticulate_api.app import lifespan as app_lifespan
-from chessticulate_api.workers_service import ClientRequestError, ServerRequestError
+from chessticulate_api.config import CONFIG
+from chessticulate_api.workers_service import (
+    ClientRequestError,
+    ServerRequestError,
+)
 
 
 @pytest_asyncio.fixture
