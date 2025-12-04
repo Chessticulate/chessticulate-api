@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock
 
 import jwt
 import pytest
@@ -10,15 +11,16 @@ from httpx import ASGITransport, AsyncClient, Response
 from chessticulate_api import app, crud
 from chessticulate_api.app import lifespan as app_lifespan
 from chessticulate_api.config import CONFIG
-from chessticulate_api.workers_service import (
-    ClientRequestError,
-    ServerRequestError,
-)
+from chessticulate_api.workers_service import ClientRequestError, ServerRequestError
 
 
 @pytest_asyncio.fixture
 async def client():
     async with app_lifespan(app):
+        # Completely mock Redis: no network calls, no checks
+        fake_redis = AsyncMock(name="FakeRedis")
+        app.state.redis = fake_redis
+
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac

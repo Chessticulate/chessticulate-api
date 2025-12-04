@@ -27,7 +27,7 @@ async def lifespan(app_: FastAPI):
     try:
         yield
     finally:
-        await app.state.redis.aclose()
+        await app_.state.redis.aclose()
 
 
 app = FastAPI(
