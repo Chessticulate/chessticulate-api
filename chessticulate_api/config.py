@@ -29,3 +29,6 @@ class CONFIG:  # pylint: disable=too-few-public-methods
 
     # chess workers service url
     workers_base_url: str = os.environ.get("WORKERS_URL", "http://localhost:8001")
+
+    # redis url
+    redis_url: str = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
