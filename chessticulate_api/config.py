@@ -16,7 +16,10 @@ class CONFIG:  # pylint: disable=too-few-public-methods
     app_port: int = int(os.environ.get("APP_PORT", 8000))
     log_level: str = os.environ.get("LOG_LEVEL", "info")
     cors_origins: list[str] = json.loads(
-        os.environ.get("CORS_ORIGINS", '["https://chess.brgdev.xyz"]')
+        os.environ.get(
+            "CORS_ORIGINS", 
+            '["https://chess.brgdev.xyz", "http://localhost:3000"]'
+        )
     )
 
     # "postgresql+asyncpg://<uname>:<pswd>@<hostname>/<dbname>
