@@ -17,8 +17,7 @@ class CONFIG:  # pylint: disable=too-few-public-methods
     log_level: str = os.environ.get("LOG_LEVEL", "info")
     cors_origins: list[str] = json.loads(
         os.environ.get(
-            "CORS_ORIGINS", 
-            '["https://chess.brgdev.xyz", "http://localhost:3000"]'
+            "CORS_ORIGINS", '["https://chess.brgdev.xyz", "http://localhost:3000"]'
         )
     )
 
