@@ -25,7 +25,6 @@ async def create_challenge(
 # pylint: disable=too-many-arguments. too-many-positional-arguments
 @challenge_router.get("")
 async def get_challenges(
-    credentials: Annotated[dict, Depends(security.get_credentials)],
     requester_id: int | None = None,
     responder_id: int | None = None,
     challenge_id: int | None = None,

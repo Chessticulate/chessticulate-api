@@ -446,4 +446,3 @@ class TestDoMove:
         assert game_after_move[0]["game"].winner == user_id
         assert game_after_move[0]["game"].is_active == False
         assert game_after_move[0]["game"].result == models.GameResult.CHECKMATE
-
