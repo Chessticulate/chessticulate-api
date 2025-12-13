@@ -263,10 +263,7 @@ class TestDeleteUser:
     async def test_delete_user_fails_not_logged_in(self, client):
         response = await client.delete("/users/self")
 
-        # pretty sure this should return a 401, cannot figure out why it returns a 403
-        # it does return a 401 on gh actions, so this fails in ci
-        # asserting either for now to fix ci test failure
-        assert response.status_code == 403 or response.status_code == 401
+        assert response.status_code in (403, 401)
 
     @pytest.mark.asyncio
     async def test_delete_user(self, client, token, restore_fake_data_after):
@@ -791,12 +788,14 @@ class TestForfeit:
 
 class TestCreateChallenge:
     @pytest.mark.asyncio
-    async def test_create_challenge_fails_not_logged_in(self):
+    async def test_create_challenge_fails_not_logged_in(self, client):
         response = await client.post("/challenges")
         assert response.status_code in (401, 403)
 
     @pytest.mark.asyncio
-    async def test_create_challenge_succeeds(self, token, restore_fake_data_after):
+    async def test_create_challenge_succeeds(
+        self, client, token, restore_fake_data_after
+    ):
         response = await client.post(
             "/challenges",
             headers={"Authorization": f"Bearer {token}"},
@@ -807,12 +806,12 @@ class TestCreateChallenge:
 
 class TestGetChallenges:
     @pytest.mark.asyncio
-    async def test_get_challenges_fails_not_logged_in(self):
+    async def test_get_challenges_fails_not_logged_in(self, client):
         response = await client.get("/challenges")
         assert response.status_code in (401, 403)
 
     @pytest.mark.asyncio
-    async def test_get_challenges_empty(self, token):
+    async def test_get_challenges_empty(self, client, token):
         response = await client.get(
             "/challenges", headers={"Authorization": f"Bearer {token}"}
         )
@@ -821,7 +820,7 @@ class TestGetChallenges:
 
     @pytest.mark.asyncio
     async def test_get_challenges_succeeds_and_includes_requester_username(
-        self, token, restore_fake_data_after
+        self, client, token, restore_fake_data_after
     ):
         # create challenge
         create_resp = await client.post(
@@ -852,12 +851,12 @@ class TestGetChallenges:
 
 class TestAcceptChallenge:
     @pytest.mark.asyncio
-    async def test_accept_challenge_fails_not_logged_in(self):
+    async def test_accept_challenge_fails_not_logged_in(self, client):
         response = await client.post("/challenges/1/accept")
         assert response.status_code in (401, 403)
 
     @pytest.mark.asyncio
-    async def test_accept_challenge_fails_challenge_does_not_exist(self, token):
+    async def test_accept_challenge_fails_challenge_does_not_exist(self, client, token):
         response = await client.post(
             "/challenges/42069/accept",
             headers={"Authorization": f"Bearer {token}"},
@@ -866,7 +865,7 @@ class TestAcceptChallenge:
 
     @pytest.mark.asyncio
     async def test_accept_challenge_fails_cannot_accept_own(
-        self, token, restore_fake_data_after
+        self, client, token, restore_fake_data_after
     ):
         # user 1 creates it
         create_resp = await client.post(
@@ -885,7 +884,9 @@ class TestAcceptChallenge:
         assert accept_resp.json()["detail"] == "cannot accept own challenge"
 
     @pytest.mark.asyncio
-    async def test_accept_challenge_succeeds(self, token, restore_fake_data_after):
+    async def test_accept_challenge_succeeds(
+        self, client, token, restore_fake_data_after
+    ):
         # user 1 creates
         create_resp = await client.post(
             "/challenges",
@@ -922,12 +923,12 @@ class TestAcceptChallenge:
 
 class TestCancelChallenge:
     @pytest.mark.asyncio
-    async def test_cancel_challenge_fails_not_logged_in(self):
+    async def test_cancel_challenge_fails_not_logged_in(self, client):
         response = await client.post("/challenges/1/cancel")
         assert response.status_code in (401, 403)
 
     @pytest.mark.asyncio
-    async def test_cancel_challenge_fails_challenge_does_not_exist(self, token):
+    async def test_cancel_challenge_fails_challenge_does_not_exist(self, client, token):
         response = await client.post(
             "/challenges/42069/cancel",
             headers={"Authorization": f"Bearer {token}"},
@@ -936,7 +937,7 @@ class TestCancelChallenge:
 
     @pytest.mark.asyncio
     async def test_cancel_challenge_fails_not_creator(
-        self, token, restore_fake_data_after
+        self, client, token, restore_fake_data_after
     ):
         # user1 creates
         create_resp = await client.post(
@@ -956,7 +957,9 @@ class TestCancelChallenge:
         assert cancel_resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_cancel_challenge_succeeds(self, token, restore_fake_data_after):
+    async def test_cancel_challenge_succeeds(
+        self, client, token, restore_fake_data_after
+    ):
         create_resp = await client.post(
             "/challenges",
             headers={"Authorization": f"Bearer {token}"},
