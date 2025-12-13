@@ -68,7 +68,7 @@ async def accept_challenge(
     # does challenge exist
     challenge_list = await crud.get_challenges(id_=challenge_id, limit=1)
     if not challenge_list:
-        raise HTTPException(status_code=400, detail="challenge does not exist")
+        raise HTTPException(status_code=404, detail="challenge does not exist")
 
     challenge = challenge_list[0]["challenge"]
 
@@ -106,7 +106,7 @@ async def cancel_challenge(
 
     # does challenge exist
     if not challenge_list:
-        raise HTTPException(status_code=400, detail="challenge does not exist")
+        raise HTTPException(status_code=404, detail="challenge does not exist")
 
     challenge = challenge_list[0]["challenge"]
 

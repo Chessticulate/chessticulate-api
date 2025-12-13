@@ -263,7 +263,7 @@ class TestDeleteUser:
     async def test_delete_user_fails_not_logged_in(self, client):
         response = await client.delete("/users/self")
 
-        assert response.status_code in (403, 401)
+        assert response.status_code == 401
 
     @pytest.mark.asyncio
     async def test_delete_user(self, client, token, restore_fake_data_after):
@@ -790,7 +790,7 @@ class TestCreateChallenge:
     @pytest.mark.asyncio
     async def test_create_challenge_fails_not_logged_in(self, client):
         response = await client.post("/challenges")
-        assert response.status_code in (401, 403)
+        assert response.status_code == 401
 
     @pytest.mark.asyncio
     async def test_create_challenge_succeeds(
@@ -808,7 +808,7 @@ class TestGetChallenges:
     @pytest.mark.asyncio
     async def test_get_challenges_fails_not_logged_in(self, client):
         response = await client.get("/challenges")
-        assert response.status_code in (401, 403)
+        assert response.status_code == 401
 
     @pytest.mark.asyncio
     async def test_get_challenges_empty(self, client, token):
@@ -853,7 +853,7 @@ class TestAcceptChallenge:
     @pytest.mark.asyncio
     async def test_accept_challenge_fails_not_logged_in(self, client):
         response = await client.post("/challenges/1/accept")
-        assert response.status_code in (401, 403)
+        assert response.status_code == 401
 
     @pytest.mark.asyncio
     async def test_accept_challenge_fails_challenge_does_not_exist(self, client, token):
@@ -861,7 +861,7 @@ class TestAcceptChallenge:
             "/challenges/42069/accept",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert response.status_code in (400, 404)
+        assert response.status_code == 404
 
     @pytest.mark.asyncio
     async def test_accept_challenge_fails_cannot_accept_own(
@@ -925,7 +925,7 @@ class TestCancelChallenge:
     @pytest.mark.asyncio
     async def test_cancel_challenge_fails_not_logged_in(self, client):
         response = await client.post("/challenges/1/cancel")
-        assert response.status_code in (401, 403)
+        assert response.status_code == 401
 
     @pytest.mark.asyncio
     async def test_cancel_challenge_fails_challenge_does_not_exist(self, client, token):
@@ -933,7 +933,7 @@ class TestCancelChallenge:
             "/challenges/42069/cancel",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert response.status_code in (400, 404)
+        assert response.status_code == 404
 
     @pytest.mark.asyncio
     async def test_cancel_challenge_fails_not_creator(
