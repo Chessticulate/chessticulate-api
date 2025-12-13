@@ -2,7 +2,17 @@
 
 import enum
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, func, sql
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    func,
+    sql,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from chessticulate_api import db
@@ -22,10 +32,18 @@ class GameType(enum.Enum):
 
 
 class InvitationStatus(enum.StrEnum):
-    """Invitation Response Enum"""
+    """Invitation Status Enum"""
 
     ACCEPTED = "ACCEPTED"
     DECLINED = "DECLINED"
+    PENDING = "PENDING"
+    CANCELLED = "CANCELLED"
+
+
+class ChallengeRequestStatus(enum.StrEnum):
+    """Challenge Request Status Enum"""
+
+    ACCEPTED = "ACCEPTED"
     PENDING = "PENDING"
     CANCELLED = "CANCELLED"
 
@@ -51,7 +69,7 @@ class User(Base):  # pylint: disable=too-few-public-methods
     __tablename__ = "users"
 
     id_: Mapped[int] = mapped_column("id", primary_key=True)
-    name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     password: Mapped[str] = mapped_column(String, nullable=True)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=True)
     deleted: Mapped[bool] = mapped_column(
@@ -89,10 +107,40 @@ class Invitation(Base):  # pylint: disable=too-few-public-methods
     )
 
 
+class ChallengeRequest(Base):  # pylint: disable=too-few-public-methods
+    """Challenge Request SQL Model"""
+
+    __tablename__ = "challenge_requests"
+
+    id_: Mapped[int] = mapped_column("id", primary_key=True)
+    requester_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[str] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),  # pylint: disable=not-callable
+    )
+    game_type: Mapped[str] = mapped_column(
+        Enum(GameType), nullable=False, server_default=GameType.CHESS.value
+    )
+    status: Mapped[str] = mapped_column(
+        Enum(ChallengeRequestStatus),
+        nullable=False,
+        server_default=ChallengeRequestStatus.PENDING.value,
+    )
+    fulfilled_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
+    game_id: Mapped[int] = mapped_column(ForeignKey("games.id"), nullable=True)
+
+
 class Game(Base):  # pylint: disable=too-few-public-methods
     """Game SQL Model"""
 
     __tablename__ = "games"
+    __table_args__ = (
+        CheckConstraint(
+            "(invitation_id IS NOT NULL) OR (challenge_id IS NOT NULL)",
+            name="ck_game_invitation_or_challenge",
+        ),
+    )
 
     id_: Mapped[int] = mapped_column("id", primary_key=True)
     game_type: Mapped[str] = mapped_column(
@@ -104,7 +152,10 @@ class Game(Base):  # pylint: disable=too-few-public-methods
         nullable=False,
     )
     invitation_id: Mapped[int] = mapped_column(
-        ForeignKey("invitations.id"), nullable=False
+        ForeignKey("invitations.id"), nullable=True
+    )
+    challenge_id: Mapped[int] = mapped_column(
+        ForeignKey("challenge_requests.id"), nullable=True
     )
     last_active: Mapped[str] = mapped_column(
         DateTime,

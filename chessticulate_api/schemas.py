@@ -61,6 +61,45 @@ class GetInvitationResponse(BaseModel):
     status: str
 
 
+class CreateChallengeResponse(BaseModel):
+    """pydantic model for challenge creation response"""
+
+    id_: int = Field(
+        ..., validation_alias=AliasChoices("id_", "id"), serialization_alias="id"
+    )
+    created_at: datetime
+    requester_id: int
+    game_type: str
+    status: str
+
+
+class GetChallengeResponse(BaseModel):
+    """Pydantic model for get challenge response"""
+
+    id_: int = Field(
+        ..., validation_alias=AliasChoices("id_", "id"), serialization_alias="id"
+    )
+    requester_id: int
+    requester_username: str
+    fulfilled_by: int | None = None
+    created_at: datetime
+    game_type: str
+    game_id: int | None = None
+    status: str
+
+
+class GetChallengeListResponse(RootModel):
+    """Pydantic model for returning a list of GetChallengeResponses"""
+
+    root: list[GetChallengeResponse]
+
+
+class AcceptChallengeResponse(BaseModel):
+    """Pydantic model for accepting a challenge request"""
+
+    game_id: int
+
+
 class LoginRequest(BaseModel):
     """pydantic Model fro Login Requests"""
 

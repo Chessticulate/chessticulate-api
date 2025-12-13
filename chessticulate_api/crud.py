@@ -145,7 +145,7 @@ async def create_invitation(
 
 async def get_invitations(
     *, skip: int = 0, limit: int = 10, reverse: bool = False, **kwargs
-) -> list[tuple[models.Invitation, str, str]]:
+) -> list[dict[str, models.Invitation | str]]:
     """
     Retrieve a list of invitations from DB.
 
@@ -417,25 +417,6 @@ async def do_move(
         ).one()[0]
 
 
-async def get_moves(
-    *, skip: int = 0, limit: int = 10, reverse: bool = False, **kwargs
-) -> list[models.Move]:
-    """Get move(s) from database"""
-
-    async with db.async_session() as session:
-        stmt = select(models.Move)
-        for k, v in kwargs.items():
-            stmt = stmt.where(getattr(models.Move, k) == v)
-
-        if reverse:
-            stmt = stmt.order_by(models.Move.timestamp.desc())
-        else:
-            stmt = stmt.order_by(models.Move.timestamp.asc())
-
-        stmt = stmt.offset(skip).limit(limit)
-        return [row[0] for row in (await session.execute(stmt)).all()]
-
-
 async def forfeit(id_: int, user_id: int) -> models.Game:
     """Forefeit game"""
 
@@ -463,3 +444,111 @@ async def forfeit(id_: int, user_id: int) -> models.Game:
         return (
             await session.execute(select(models.Game).where(models.Game.id_ == id_))
         ).one()[0]
+
+
+async def create_challenge(
+    user_id: int, game_type: models.GameType = models.GameType.CHESS
+) -> models.ChallengeRequest:
+    """Create challenge request"""
+    async with db.async_session() as session:
+        challenge = models.ChallengeRequest(
+            requester_id=user_id,
+            game_type=game_type,
+        )
+        session.add(challenge)
+        await session.commit()
+        await session.refresh(challenge)
+        return challenge
+
+
+async def get_challenges(
+    *,
+    skip: int = 0,
+    limit: int = 10,
+    order_by: str = "created_at",
+    reverse: bool = False,
+    **kwargs,
+) -> list[dict[str, models.ChallengeRequest | str]]:
+    """Retrieve a list of challenge requests along with the requester's username"""
+
+    requester = aliased(models.User)
+
+    async with db.async_session() as session:
+        stmt = select(
+            models.ChallengeRequest,
+            requester.name.label("requester_username"),
+        ).join(requester, models.ChallengeRequest.requester_id == requester.id_)
+
+        for k, v in kwargs.items():
+            stmt = stmt.where(getattr(models.ChallengeRequest, k) == v)
+
+        order_attr = getattr(models.ChallengeRequest, order_by)
+        order_attr = order_attr.desc() if reverse else order_attr.asc()
+        stmt = stmt.order_by(order_attr)
+
+        stmt = stmt.offset(skip).limit(limit)
+
+        rows = (await session.execute(stmt)).all()
+
+        return [
+            {
+                "challenge": challenge,
+                "requester_username": requester_username,
+            }
+            for challenge, requester_username in rows
+        ]
+
+
+async def accept_challenge(id_: int, user_id: int) -> models.Game | None:
+    """Accept challenge request"""
+
+    async with db.async_session() as session:
+        stmt = select(models.ChallengeRequest).where(
+            models.ChallengeRequest.id_ == id_,
+            models.ChallengeRequest.status == models.ChallengeRequestStatus.PENDING,
+        )
+        result = (await session.execute(stmt)).first()
+        challenge = None if not result else result[0]
+        if challenge is None:
+            return None
+
+        challenge.status = models.ChallengeRequestStatus.ACCEPTED
+        challenge.fulfilled_by = user_id
+
+        players = [challenge.requester_id, user_id]
+        random.shuffle(players)
+
+        new_game = models.Game(
+            white=players[0],
+            black=players[1],
+            whomst=players[0],
+            challenge_id=id_,
+            game_type=challenge.game_type,
+        )
+        session.add(new_game)
+        await session.flush()
+        challenge.game_id = new_game.id_
+        await session.commit()
+
+        return new_game
+
+
+async def cancel_challenge(id_: int) -> bool:
+    """
+    Cancel challenge.
+
+    Returns False if challenge does not exist.
+    Returns True on success.
+    """
+    async with db.async_session() as session:
+        stmt = (
+            update(models.ChallengeRequest)
+            .where(
+                models.ChallengeRequest.id_ == id_,
+                models.ChallengeRequest.status == models.ChallengeRequestStatus.PENDING,
+            )
+            .values(status=models.ChallengeRequestStatus.CANCELLED)
+        )
+        result = await session.execute(stmt)
+        await session.commit()
+        return result.rowcount == 1
