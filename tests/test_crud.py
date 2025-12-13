@@ -446,3 +446,155 @@ class TestDoMove:
         assert game_after_move[0]["game"].winner == user_id
         assert game_after_move[0]["game"].is_active == False
         assert game_after_move[0]["game"].result == models.GameResult.CHECKMATE
+
+
+class TestCreateChallenge:
+    @pytest.mark.asyncio
+    async def test_create_challenge_fails_requester_does_not_exist(self):
+        with pytest.raises(sqlalchemy.exc.IntegrityError):
+            await crud.create_challenge(42069)
+
+    @pytest.mark.asyncio
+    async def test_create_challenge_succeeds(self, restore_fake_data_after):
+        requester_id = 1
+
+        challenge = await crud.create_challenge(requester_id)
+
+        assert challenge is not None
+        assert challenge.requester_id == requester_id
+        assert challenge.status == models.ChallengeRequestStatus.PENDING
+        assert challenge.fulfilled_by is None
+        assert challenge.game_id is None
+        assert challenge.game_type == models.GameType.CHESS
+
+
+class TestGetChallenges:
+    @pytest.mark.asyncio
+    async def test_get_challenges_fails_does_not_exist(self):
+        challenges = await crud.get_challenges(id_=42069)
+        assert challenges == []
+
+    @pytest.mark.asyncio
+    async def test_get_challenges_succeeds_includes_username(
+        self, restore_fake_data_after
+    ):
+        requester_id = 1
+        requester = (await crud.get_users(id_=requester_id))[0]
+
+        created = await crud.create_challenge(requester_id)
+
+        rows = await crud.get_challenges(id_=created.id_)
+        assert len(rows) == 1
+
+        row = rows[0]
+        assert "challenge" in row
+        assert "requester_username" in row
+
+        challenge = row["challenge"]
+        assert challenge.id_ == created.id_
+        assert challenge.requester_id == requester_id
+        assert row["requester_username"] == requester.name
+
+    @pytest.mark.asyncio
+    async def test_get_challenges_filters(self, restore_fake_data_after):
+        requester_id = 1
+
+        c1 = await crud.create_challenge(requester_id)
+        c2 = await crud.create_challenge(requester_id)
+
+        rows = await crud.get_challenges(requester_id=requester_id)
+        ids = [r["challenge"].id_ for r in rows]
+        assert c1.id_ in ids
+        assert c2.id_ in ids
+
+        # filter by id_
+        rows = await crud.get_challenges(id_=c1.id_)
+        assert len(rows) == 1
+        assert rows[0]["challenge"].id_ == c1.id_
+
+        # filter by status
+        rows = await crud.get_challenges(status=models.ChallengeRequestStatus.PENDING)
+        pending_ids = [r["challenge"].id_ for r in rows]
+        assert c1.id_ in pending_ids
+        assert c2.id_ in pending_ids
+
+
+class TestAcceptChallenge:
+    @pytest.mark.asyncio
+    async def test_accept_challenge_fails_doesnt_exist(self):
+        assert await crud.accept_challenge(42069, 2) is None
+
+    @pytest.mark.asyncio
+    async def test_accept_challenge_fails_not_pending(self, restore_fake_data_after):
+        requester_id = 1
+        acceptor_id = 2
+
+        challenge = await crud.create_challenge(requester_id)
+
+        game1 = await crud.accept_challenge(challenge.id_, acceptor_id)
+        assert game1 is not None
+
+        game2 = await crud.accept_challenge(challenge.id_, acceptor_id)
+        assert game2 is None
+
+    @pytest.mark.asyncio
+    async def test_accept_challenge_succeeds_sets_fields_and_creates_game(
+        self, restore_fake_data_after
+    ):
+        requester_id = 1
+        acceptor_id = 2
+
+        challenge = await crud.create_challenge(requester_id)
+        assert challenge.status == models.ChallengeRequestStatus.PENDING
+        assert challenge.fulfilled_by is None
+        assert challenge.game_id is None
+
+        game = await crud.accept_challenge(challenge.id_, acceptor_id)
+        assert game is not None
+
+        assert game.challenge_id == challenge.id_
+        assert game.invitation_id is None
+        assert game.game_type == models.GameType.CHESS
+
+        assert set([game.white, game.black]) == set([requester_id, acceptor_id])
+        assert game.whomst in (game.white, game.black)
+
+        rows = await crud.get_challenges(id_=challenge.id_, limit=1)
+        assert len(rows) == 1
+        updated = rows[0]["challenge"]
+
+        assert updated.status == models.ChallengeRequestStatus.ACCEPTED
+        assert updated.fulfilled_by == acceptor_id
+        assert updated.game_id == game.id_
+
+
+class TestCancelChallenge:
+    @pytest.mark.asyncio
+    async def test_cancel_challenge_fails_doesnt_exist(self):
+        assert await crud.cancel_challenge(42069) is False
+
+    @pytest.mark.asyncio
+    async def test_cancel_challenge_fails_not_pending(self, restore_fake_data_after):
+        requester_id = 1
+        acceptor_id = 2
+
+        challenge = await crud.create_challenge(requester_id)
+        game = await crud.accept_challenge(challenge.id_, acceptor_id)
+        assert game is not None
+
+        assert await crud.cancel_challenge(challenge.id_) is False
+
+    @pytest.mark.asyncio
+    async def test_cancel_challenge_succeeds(self, restore_fake_data_after):
+        requester_id = 1
+        challenge = await crud.create_challenge(requester_id)
+
+        rows = await crud.get_challenges(id_=challenge.id_, limit=1)
+        assert len(rows) == 1
+        assert rows[0]["challenge"].status == models.ChallengeRequestStatus.PENDING
+
+        assert await crud.cancel_challenge(challenge.id_) is True
+
+        rows = await crud.get_challenges(id_=challenge.id_, limit=1)
+        assert len(rows) == 1
+        assert rows[0]["challenge"].status == models.ChallengeRequestStatus.CANCELLED

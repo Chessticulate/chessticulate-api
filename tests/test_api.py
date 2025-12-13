@@ -5,6 +5,7 @@ import pytest
 import respx
 from fastapi import FastAPI, HTTPException
 from httpx import ASGITransport, AsyncClient, Response
+from pydantic import SecretStr
 
 from chessticulate_api import app, crud
 from chessticulate_api.config import CONFIG
@@ -748,3 +749,193 @@ class TestForfeit:
         assert response.json()["id"] == 1
         assert response.json()["is_active"] == False
         assert response.json()["result"] == "RESIGNATION"
+
+
+class TestCreateChallenge:
+    @pytest.mark.asyncio
+    async def test_create_challenge_fails_not_logged_in(self):
+        response = await client.post("/challenges")
+        assert response.status_code in (401, 403)
+
+    @pytest.mark.asyncio
+    async def test_create_challenge_succeeds(self, token, restore_fake_data_after):
+        response = await client.post(
+            "/challenges",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 201
+
+
+class TestGetChallenges:
+    @pytest.mark.asyncio
+    async def test_get_challenges_fails_not_logged_in(self):
+        response = await client.get("/challenges")
+        assert response.status_code in (401, 403)
+
+    @pytest.mark.asyncio
+    async def test_get_challenges_empty(self, token):
+        response = await client.get(
+            "/challenges", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        assert response.json() == []
+
+    @pytest.mark.asyncio
+    async def test_get_challenges_succeeds_and_includes_requester_username(
+        self, token, restore_fake_data_after
+    ):
+        # create challenge
+        create_resp = await client.post(
+            "/challenges",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert create_resp.status_code == 201
+        challenge_id = create_resp.json()["id"]
+
+        # fetch it by id
+        response = await client.get(
+            f"/challenges?challenge_id={challenge_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        rows = response.json()
+        assert len(rows) == 1
+
+        row = rows[0]
+        assert row["id"] == challenge_id
+        assert row["requester_id"] == 1
+        assert row["requester_username"] == "fakeuser1"
+        assert row["status"] == "PENDING"
+        assert row["fulfilled_by"] is None
+        assert row["game_id"] is None
+
+
+class TestAcceptChallenge:
+    @pytest.mark.asyncio
+    async def test_accept_challenge_fails_not_logged_in(self):
+        response = await client.post("/challenges/1/accept")
+        assert response.status_code in (401, 403)
+
+    @pytest.mark.asyncio
+    async def test_accept_challenge_fails_challenge_does_not_exist(self, token):
+        response = await client.post(
+            "/challenges/42069/accept",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code in (400, 404)
+
+    @pytest.mark.asyncio
+    async def test_accept_challenge_fails_cannot_accept_own(
+        self, token, restore_fake_data_after
+    ):
+        # user 1 creates it
+        create_resp = await client.post(
+            "/challenges",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert create_resp.status_code == 201
+        challenge_id = create_resp.json()["id"]
+
+        # user 1 tries to accept own challenge
+        accept_resp = await client.post(
+            f"/challenges/{challenge_id}/accept",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert accept_resp.status_code == 400
+        assert accept_resp.json()["detail"] == "cannot accept own challenge"
+
+    @pytest.mark.asyncio
+    async def test_accept_challenge_succeeds(self, token, restore_fake_data_after):
+        # user 1 creates
+        create_resp = await client.post(
+            "/challenges",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert create_resp.status_code == 201
+        challenge_id = create_resp.json()["id"]
+
+        # accept as another user (fakeuser2 id=2)
+        token_user2 = await crud.login("fakeuser2", SecretStr("fakepswd2"))
+
+        accept_resp = await client.post(
+            f"/challenges/{challenge_id}/accept",
+            headers={"Authorization": f"Bearer {token_user2}"},
+        )
+
+        assert accept_resp.status_code == 202
+        body = accept_resp.json()
+        assert "game_id" in body
+        assert body["game_id"] is not None
+
+        # verify challenge now has accepted fields
+        get_resp = await client.get(
+            f"/challenges?challenge_id={challenge_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert get_resp.status_code == 200
+        row = get_resp.json()[0]
+
+        assert row["status"] == "ACCEPTED"
+        assert row["fulfilled_by"] == 2
+        assert row["game_id"] == body["game_id"]
+
+
+class TestCancelChallenge:
+    @pytest.mark.asyncio
+    async def test_cancel_challenge_fails_not_logged_in(self):
+        response = await client.post("/challenges/1/cancel")
+        assert response.status_code in (401, 403)
+
+    @pytest.mark.asyncio
+    async def test_cancel_challenge_fails_challenge_does_not_exist(self, token):
+        response = await client.post(
+            "/challenges/42069/cancel",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code in (400, 404)
+
+    @pytest.mark.asyncio
+    async def test_cancel_challenge_fails_not_creator(
+        self, token, restore_fake_data_after
+    ):
+        # user1 creates
+        create_resp = await client.post(
+            "/challenges",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert create_resp.status_code == 201
+        challenge_id = create_resp.json()["id"]
+
+        token_user2 = await crud.login("fakeuser2", SecretStr("fakepswd2"))
+
+        # user2 tries to cancel user1's challenge
+        cancel_resp = await client.post(
+            f"/challenges/{challenge_id}/cancel",
+            headers={"Authorization": f"Bearer {token_user2}"},
+        )
+        assert cancel_resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_cancel_challenge_succeeds(self, token, restore_fake_data_after):
+        create_resp = await client.post(
+            "/challenges",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert create_resp.status_code == 201
+        challenge_id = create_resp.json()["id"]
+
+        cancel_resp = await client.post(
+            f"/challenges/{challenge_id}/cancel",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert cancel_resp.status_code == 200
+
+        get_resp = await client.get(
+            f"/challenges?challenge_id={challenge_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert get_resp.status_code == 200
+        row = get_resp.json()[0]
+        assert row["status"] == "CANCELLED"

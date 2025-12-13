@@ -37,6 +37,7 @@ app.add_middleware(
 app.include_router(routers.user_router)
 app.include_router(routers.invitation_router)
 app.include_router(routers.game_router)
+app.include_router(routers.challenge_router)
 
 
 @app.get("/", include_in_schema=False)

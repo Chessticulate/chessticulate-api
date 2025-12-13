@@ -10,12 +10,13 @@ from chessticulate_api import crud, models, schemas, security
 challenge_router = APIRouter(prefix="/challenges")
 
 
+# pylint: disable=unused-argument
 @challenge_router.post("", status_code=201)
 async def create_challenge(
     credentials: Annotated[dict, Depends(security.get_credentials)],
 ) -> (
     schemas.CreateChallengeResponse
-):  # I think this should be CreateChallengeRequestRequest ?
+):
     """Create a new challenge request"""
 
     challenge = await crud.create_challenge(credentials["user_id"])
@@ -25,6 +26,7 @@ async def create_challenge(
 # pylint: disable=too-many-arguments. too-many-positional-arguments
 @challenge_router.get("")
 async def get_challenges(
+    credentials: Annotated[dict, Depends(security.get_credentials)],
     requester_id: int | None = None,
     responder_id: int | None = None,
     challenge_id: int | None = None,
