@@ -14,9 +14,7 @@ challenge_router = APIRouter(prefix="/challenges")
 @challenge_router.post("", status_code=201)
 async def create_challenge(
     credentials: Annotated[dict, Depends(security.get_credentials)],
-) -> (
-    schemas.CreateChallengeResponse
-):
+) -> schemas.CreateChallengeResponse:
     """Create a new challenge request"""
 
     challenge = await crud.create_challenge(credentials["user_id"])
