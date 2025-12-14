@@ -1,30 +1,17 @@
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock
 
 import jwt
 import pytest
 import pytest_asyncio
 import respx
 from fastapi import FastAPI, HTTPException
-from httpx import ASGITransport, AsyncClient, Response
+from httpx import Response
 from pydantic import SecretStr
 
 from chessticulate_api import app, crud
 from chessticulate_api.app import lifespan as app_lifespan
 from chessticulate_api.config import CONFIG
 from chessticulate_api.workers_service import ClientRequestError, ServerRequestError
-
-
-@pytest_asyncio.fixture
-async def client():
-    async with app_lifespan(app):
-        # Completely mock Redis: no network calls, no checks
-        fake_redis = AsyncMock(name="FakeRedis")
-        app.state.redis = fake_redis
-
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as ac:
-            yield ac
 
 
 class TestToken:

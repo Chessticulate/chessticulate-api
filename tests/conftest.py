@@ -1,12 +1,14 @@
 from copy import copy
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from chessticulate_api import config, crud, db, models
+from chessticulate_api import app, config, crud, db, models
 
 FAKE_USER_DATA = [
     {
@@ -170,6 +172,8 @@ async def token(scope="session"):
 
 
 async def _init_fake_data():
+    await db.async_engine.dispose()
+
     db.async_engine = db.create_async_engine(
         config.CONFIG.sql_conn_str, echo=config.CONFIG.sql_echo
     )
@@ -216,3 +220,12 @@ async def init_fake_data():
 async def restore_fake_data_after():
     yield
     await _init_fake_data()
+
+
+@pytest_asyncio.fixture
+async def client():
+    app.state.redis = AsyncMock(name="FakeRedis")
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        yield ac

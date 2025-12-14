@@ -1,15 +1,17 @@
 """chessticulate_api.app"""
 
-import importlib
+import importlib.metadata
 from contextlib import asynccontextmanager
+from typing import Annotated
 
-import sqlalchemy
-from fastapi import FastAPI, HTTPException
+import sqlalchemy.exc
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from chessticulate_api import crud, models, routers, schemas
+from chessticulate_api import crud, db, models, routers, schemas
 from chessticulate_api.config import CONFIG
 
 
@@ -18,9 +20,8 @@ async def lifespan(app_: FastAPI):
     """Setup DB and Redis"""
     await models.init_db()
 
-    redis_url = getattr(CONFIG, "redis_url", "redis://localhost:6379/0")
-    app_.state.redis: Redis = Redis.from_url(
-        redis_url,
+    app_.state.redis = Redis.from_url(
+        CONFIG.redis_url,
         decode_responses=True,
     )
 
@@ -28,6 +29,7 @@ async def lifespan(app_: FastAPI):
         yield
     finally:
         await app_.state.redis.aclose()
+        await db.async_engine.dispose()
 
 
 app = FastAPI(
@@ -58,21 +60,32 @@ async def docs_redirect():
 
 
 @app.post("/login")
-async def login(payload: schemas.LoginRequest) -> schemas.LoginResponse:
+async def login(
+    session: Annotated[AsyncSession, Depends(db.session)], payload: schemas.LoginRequest
+) -> schemas.LoginResponse:
     """Given valid user credentials, generate JWT."""
-    if not (token := await crud.login(payload.name, payload.password)):
+    if not (token := await crud.login(session, payload.name, payload.password)):
         raise HTTPException(status_code=401, detail="invalid credentials")
-    return {"jwt": token}
+    return schemas.LoginResponse(jwt=token)
 
 
 @app.post("/signup", status_code=201)
-async def signup(payload: schemas.CreateUserRequest) -> schemas.GetOwnUserResponse:
+async def signup(
+    session: Annotated[AsyncSession, Depends(db.session)],
+    payload: schemas.CreateUserRequest,
+) -> schemas.GetOwnUserResponse:
     """Create a new user account."""
-    try:
-        user = await crud.create_user(payload.name, payload.email, payload.password)
-    except sqlalchemy.exc.IntegrityError as ie:
-        raise HTTPException(
-            status_code=400, detail="user with same name or email already exists"
-        ) from ie
+    async with session.begin():
+        if await crud.get_users(session, name=payload.name):
+            raise HTTPException(
+                status_code=400, detail="user with same name already exists"
+            )
+        if await crud.get_users(session, name=payload.email):
+            raise HTTPException(
+                status_code=400, detail="user with same name already exists"
+            )
+        user = await crud.create_user(
+            session, payload.name, payload.email, payload.password
+        )
 
-    return vars(user)
+    return schemas.GetOwnUserResponse(**vars(user))
