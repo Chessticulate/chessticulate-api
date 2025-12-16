@@ -6,6 +6,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from chessticulate_api import app, config, crud, db, models
@@ -145,8 +146,8 @@ FAKE_MOVE_DATA = [
 ]
 
 
-@pytest.fixture
-def fake_app_secret(scope="session", autouse=True):
+@pytest.fixture(scope="session", autouse=True)
+def fake_app_secret():
     config.CONFIG.jwt_secret = "fake_secret"
 
 
@@ -155,20 +156,54 @@ def fake_user_data():
     return copy(FAKE_USER_DATA)
 
 
-@pytest.fixture
-def fake_invitation_data(scope="session"):
+@pytest.fixture(scope="session")
+def fake_invitation_data():
     return copy(FAKE_INVITATION_DATA)
 
 
-@pytest.fixture
-def fake_game_data(scope="session"):
+@pytest.fixture(scope="session")
+def fake_game_data():
     return copy(FAKE_GAME_DATA)
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def override_db_session_dependency():
+    """
+    db.session() is an @asynccontextmanager, so calling it returns a context manager
+    object (not an async-generator dependency). FastAPI's Depends() expects a
+    yield-style dependency it can drive.
+
+    In tests, we override db.session with a wrapper that:
+      - enters your context manager (async with db.session())
+      - yields a real AsyncSession to the endpoint
+      - exits the context manager after the request (triggering your commit)
+    """
+
+    async def _override():
+        async with db.session() as sesh:
+            yield sesh
+
+    app.dependency_overrides[db.session] = _override
+    yield
+    app.dependency_overrides.pop(db.session, None)
+
+
 @pytest_asyncio.fixture
-async def token(scope="session"):
+async def session() -> AsyncSession:
+    async with db.session() as sesh:
+        yield sesh
+
+
+@pytest_asyncio.fixture
+async def token(session: AsyncSession) -> str:
     fakeuser1 = FAKE_USER_DATA[0]
-    return await crud.login(fakeuser1["name"], SecretStr(fakeuser1["password"]))
+    token = await crud.login(
+        session,
+        fakeuser1["name"],
+        SecretStr(fakeuser1["password"]),
+    )
+    assert token is not None
+    return token
 
 
 async def _init_fake_data():

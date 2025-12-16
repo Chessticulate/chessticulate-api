@@ -4,7 +4,6 @@ import importlib.metadata
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-import sqlalchemy.exc
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse

@@ -20,7 +20,7 @@ async def create_challenge(
 
     async with session.begin():
         if not (
-            result := await crud.get_challenges(
+            await crud.get_challenges(
                 session,
                 requester_id=credentials.user_id,
                 status=models.ChallengeRequestStatus.PENDING,
@@ -33,11 +33,11 @@ async def create_challenge(
     return schemas.CreateChallengeResponse(**vars(challenge))
 
 
-# pylint: disable=too-many-arguments. too-many-positional-arguments
+# pylint: disable=too-many-arguments
 @challenge_router.get("")
 async def get_challenges(
     session: Annotated[AsyncSession, Depends(db.session)],
-    credentials: Annotated[schemas.Credentials, Depends(security.get_credentials)],
+    _: Annotated[schemas.Credentials, Depends(security.get_credentials)],
     requester_id: int | None = None,
     responder_id: int | None = None,
     challenge_id: int | None = None,
@@ -104,7 +104,7 @@ async def accept_challenge(
             raise HTTPException(
                 status_code=404,
                 detail=(
-                    f"user with ID '{challenge.requester_id}' who created challenge with id"
+                    f"user with ID '{challenge.requester_id}' who made challenge with id"
                     f" '{challenge_id}' does not exist"
                 ),
             )

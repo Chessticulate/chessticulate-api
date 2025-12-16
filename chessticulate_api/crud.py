@@ -83,7 +83,7 @@ async def create_user(
     return user
 
 
-async def delete_user(id_: int) -> bool:
+async def delete_user(session: AsyncSession, id_: int) -> bool:
     """
     Delete existing user.
 
@@ -155,6 +155,7 @@ async def get_invitations(
     session: AsyncSession,
     skip: int = 0,
     limit: int = 10,
+    order_by: str = "date_sent",
     reverse: bool = False,
     **kwargs,
 ) -> list[tuple[models.Invitation, WhiteUsername, BlackUsername]]:
@@ -185,19 +186,15 @@ async def get_invitations(
     for k, v in kwargs.items():
         stmt = stmt.where(getattr(models.Invitation, k) == v)
 
-    if reverse:
-        stmt = stmt.order_by(models.Invitation.date_sent.desc())
-    else:
-        stmt = stmt.order_by(models.Invitation.date_sent.asc())
+    order_attr = getattr(models.Invitation, order_by)
+    order_attr = order_attr.desc() if reverse else order_attr.asc()
+    stmt = stmt.order_by(order_attr)
 
     stmt = stmt.offset(skip).limit(limit)
 
     result = (await session.execute(stmt)).all()
 
-    return [
-        (invitation, white_username, black_username)
-        for invitation, white_username, black_username in result
-    ]
+    return result
 
 
 async def cancel_invitation(session: AsyncSession, id_: int) -> bool:
@@ -344,7 +341,7 @@ async def get_games(
     return [tuple(g) for g in games]
 
 
-# pylint: disable=too-many-arguments, too-many-positional-arguments
+# pylint: disable=too-many-arguments
 async def do_move(
     session: AsyncSession,
     id_: int,
@@ -374,9 +371,9 @@ async def do_move(
         is_active = False
 
         if (
-            status == models.GameResult.CHECKMATE
-            or status == models.GameResult.RESIGNATION
-            or status == models.GameResult.TIMEOUT
+            status in models.GameResult.CHECKMATE
+            or status in models.GameResult.RESIGNATION
+            or status in models.GameResult.TIMEOUT
         ):
             winner = user_id
 
@@ -475,7 +472,7 @@ async def get_challenges(
 
     rows = (await session.execute(stmt)).all()
 
-    return [(challenge, requester_username) for challenge, requester_username in rows]
+    return rows
 
 
 async def accept_challenge(

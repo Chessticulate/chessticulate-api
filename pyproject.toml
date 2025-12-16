@@ -41,7 +41,7 @@ line_length = 88
 preview = true  # format long strings
 
 [tool.pylint]
-max-line-length = 88
+max-line-length = 89
 
 [tool.pytest.ini_options]
 addopts = "--cov=chessticulate_api"

@@ -16,6 +16,7 @@ async_session = async_sessionmaker(async_engine, expire_on_commit=False)
 
 @contextlib.asynccontextmanager
 async def session() -> AsyncGenerator[AsyncSession, None]:
+    """Async session gnerator"""
     async with async_session() as sesh:
         yield sesh
         await sesh.commit()
