@@ -2,7 +2,7 @@
 
 import random
 from datetime import datetime, timedelta, timezone
-from typing import TypeAlias
+from typing import TypeAlias, NamedTuple
 
 import bcrypt
 import jwt
@@ -57,15 +57,11 @@ async def get_users(
     for k, v in kwargs.items():
         stmt = stmt.where(getattr(models.User, k) == v)
 
-    order_by_attr = getattr(models.User, order_by)
-    if reverse:
-        order_by_attr = order_by_attr.desc()
-    else:
-        order_by_attr = order_by_attr.asc()
-    stmt = stmt.order_by(order_by_attr)
-
+    order_attr = getattr(models.User, order_by)
+    stmt = stmt.order_by(order_attr.desc() if reverse else order_attr.asc())
     stmt = stmt.offset(skip).limit(limit)
-    return [row[0] for row in (await session.execute(stmt)).all()]
+
+    return (await session.execute(stmt)).scalars().all()
 
 
 async def create_user(
@@ -79,6 +75,7 @@ async def create_user(
     hashed_pswd = _hash_password(pswd)
     user = models.User(name=name, email=email, password=hashed_pswd)
     session.add(user)
+    await session.flush()
     await session.refresh(user)
     return user
 
@@ -92,15 +89,14 @@ async def delete_user(session: AsyncSession, id_: int) -> bool:
     not actually deleted from the users table, but is only
     marked "deleted", and it's email and password removed.
     """
-    async with db.async_session() as session:
-        stmt = (
-            # pylint: disable=singleton-comparison
-            update(models.User)
-            .where(models.User.id_ == id_, models.User.deleted == False)
-            .values(password=None, email=None, deleted=True)
-        )
-        result = await session.execute(stmt)
-        return result.rowcount == 1  # pyright: ignore
+    stmt = (
+        # pylint: disable=singleton-comparison
+        update(models.User)
+        .where(models.User.id_ == id_, models.User.deleted == False)
+        .values(password=None, email=None, deleted=True)
+    )
+    result = await session.execute(stmt)
+    return result.rowcount == 1  # pyright: ignore
 
 
 async def login(
@@ -147,6 +143,7 @@ async def create_invitation(
     """
     invitation = models.Invitation(from_id=from_id, to_id=to_id, game_type=game_type)
     session.add(invitation)
+    await session.flush()
     await session.refresh(invitation)
     return invitation
 
@@ -158,7 +155,7 @@ async def get_invitations(
     order_by: str = "date_sent",
     reverse: bool = False,
     **kwargs,
-) -> list[tuple[models.Invitation, WhiteUsername, BlackUsername]]:
+) -> list[models.Invitation]:
     """
     Retrieve a list of invitations from DB.
 
@@ -192,9 +189,16 @@ async def get_invitations(
 
     stmt = stmt.offset(skip).limit(limit)
 
-    result = (await session.execute(stmt)).all()
+    rows = (await session.execute(stmt)).all()
 
-    return result
+    invitations: list[models.Invitation] = []
+
+    for invitation, white_username, black_username in rows:
+        invitation.white_username = white_username
+        invitation.black_username = black_username
+        invitations.append(invitation)
+
+    return invitations
 
 
 async def cancel_invitation(session: AsyncSession, id_: int) -> bool:
@@ -248,6 +252,8 @@ async def accept_invitation(session: AsyncSession, id_: int) -> models.Game | No
         game_type=invitation.game_type,
     )
     session.add(new_game)
+    await session.flush()
+    await session.refresh(new_game)
 
     return new_game
 
@@ -279,7 +285,7 @@ async def get_games(
     order_by: str = "last_active",
     reverse: bool = False,
     **kwargs,
-) -> list[tuple[models.Game, WhiteUsername, BlackUsername, MoveList]]:
+) -> list[models.Game]:
     """
     Retrieve a list of games from DB.
 
@@ -317,29 +323,25 @@ async def get_games(
         stmt = stmt.where(getattr(models.Game, k) == v)
 
     order_by_attr = getattr(models.Game, order_by)
-    if reverse:
-        order_by_attr = order_by_attr.desc()
-    else:
-        order_by_attr = order_by_attr.asc()
-    stmt = stmt.order_by(order_by_attr)
+    stmt = stmt.order_by(order_by_attr.desc() if reverse else order_by_attr.asc())
 
     stmt = stmt.offset(skip).limit(limit)
 
-    result = (await session.execute(stmt)).all()
+    rows = (await session.execute(stmt)).all()
 
-    games = [
-        [game, white_username, black_username]
-        for game, white_username, black_username in result
-    ]
+    games: list[models.Game] = []
 
-    # Fetch moves separately
-    for g in games:
-        move_stmt = select(models.Move.movestr).where(models.Move.game_id == g[0].id_)
-        moves = (await session.execute(move_stmt)).scalars().all()
-        g.append(moves)
+    for game, white_username, black_username in rows:
+        move_stmt = select(models.Move.movestr).where(models.Move.game_id == game.id_)
+        move_hist = (await session.execute(move_stmt)).scalars().all()
 
-    return [tuple(g) for g in games]
+        game.white_username = white_username
+        game.black_username = black_username
+        game.move_hist = move_hist
 
+        games.append(game)
+
+    return games
 
 # pylint: disable=too-many-arguments
 async def do_move(
@@ -405,8 +407,9 @@ async def do_move(
 async def forfeit(session: AsyncSession, id_: int, user_id: int) -> models.Game:
     """Forefeit game"""
 
-    game_list = await get_games(session, id_=id_)
-    game, _, _, _ = game_list[0]
+    row = (await get_games(session, id_=id_))[0]
+    game = row.game
+
     winner = game.white if user_id == game.black else game.black
 
     stmt = (
@@ -422,8 +425,6 @@ async def forfeit(session: AsyncSession, id_: int, user_id: int) -> models.Game:
 
     await session.execute(stmt)
 
-    # maybe this should return a call to get_games
-    # so usernames are included in response
     return (
         await session.execute(select(models.Game).where(models.Game.id_ == id_))
     ).one()[0]
@@ -440,6 +441,7 @@ async def create_challenge(
         game_type=game_type,
     )
     session.add(challenge)
+    await session.flush()
     await session.refresh(challenge)
     return challenge
 
@@ -451,7 +453,7 @@ async def get_challenges(
     order_by: str = "created_at",
     reverse: bool = False,
     **kwargs,
-) -> list[tuple[models.ChallengeRequest, RequesterUsername]]:
+) -> list[models.ChallengeRequest]:
     """Retrieve a list of challenge requests along with the requester's username"""
 
     requester = aliased(models.User)
@@ -472,7 +474,12 @@ async def get_challenges(
 
     rows = (await session.execute(stmt)).all()
 
-    return rows
+    challenges: list[models.ChallengeRequest] = []
+    for challenge, requester_username in rows:
+        challenge.requester_username = requester_username
+        challenges.append(challenge)
+    
+    return challenges
 
 
 async def accept_challenge(

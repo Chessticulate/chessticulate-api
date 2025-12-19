@@ -84,6 +84,8 @@ class TestCreateUser:
                 SecretStr(fake_user_data[0]["password"]),
             )
 
+        # sessions need to be rolled back after exeptions are raised to prevent errors from cascading
+
     @pytest.mark.asyncio
     async def test_create_user_fails_duplicate_email(self, session, fake_user_data):
         with pytest.raises(sqlalchemy.exc.IntegrityError):
@@ -162,7 +164,7 @@ class TestCreateInvitation:
     async def test_create_invitation_fails_invitor_does_not_exist(
         self, session, fake_user_data
     ):
-        result = await crud.get_users(sesssion, name=fake_user_data[0]["name"])
+        result = await crud.get_users(session, name=fake_user_data[0]["name"])
         assert len(result) == 1
         invitee = result[0]
         with pytest.raises(sqlalchemy.exc.IntegrityError):
@@ -250,14 +252,14 @@ class TestCancelInvitation:
     ):
         result = await crud.get_invitations(session, id_=id_)
         assert len(result) == 1
-        invitation = result[0]["invitation"]
+        invitation = result[0]
 
         assert invitation.status == models.InvitationStatus.PENDING
         assert await crud.cancel_invitation(session, id_) is True
 
         result = await crud.get_invitations(session, id_=id_)
         assert len(result) == 1
-        invitation = result[0]["invitation"]
+        invitation = result[0]
 
         assert invitation.status == models.InvitationStatus.CANCELLED
 
@@ -279,14 +281,14 @@ class TestDeclineInvitation:
     ):
         result = await crud.get_invitations(session, id_=id_)
         assert len(result) == 1
-        invitation = result[0]["invitation"]
+        invitation = result[0]
 
         assert invitation.status == models.InvitationStatus.PENDING
         assert await crud.decline_invitation(session, id_) is True
 
         result = await crud.get_invitations(session, id_=id_)
         assert len(result) == 1
-        invitation = result[0]["invitation"]
+        invitation = result[0]
 
         assert invitation.status == models.InvitationStatus.DECLINED
 
@@ -308,14 +310,14 @@ class TestAcceptInvitation:
     ):
         result = await crud.get_invitations(session, id_=id_)
         assert len(result) == 1
-        invitation = result[0]["invitation"]
+        invitation = result[0]
         assert invitation.status == models.InvitationStatus.PENDING
 
         game = await crud.accept_invitation(session, id_)
 
         result = await crud.get_invitations(session, id_=id_)
         assert len(result) == 1
-        invitation = result[0]["invitation"]
+        invitation = result[0]
         assert invitation.status == models.InvitationStatus.ACCEPTED
         assert invitation.date_answered != None
 
@@ -356,21 +358,21 @@ class TestGetGames:
     async def test_get_games_order_by(self, session):
         games = await crud.get_games(session, order_by="whomst", limit=3, skip=1)
         assert len(games) == 2
-        assert games[0]["game"].whomst == 2
-        assert games[1]["game"].whomst == 3
+        assert games[0].whomst == 2
+        assert games[1].whomst == 3
 
     @pytest.mark.asyncio
     async def test_get_games_order_by_reverse(self, session):
         games = await crud.get_games(session, order_by="whomst", limit=3, reverse=True)
         assert len(games) == 3
-        assert games[0]["game"].whomst == 3
-        assert games[1]["game"].whomst == 2
-        assert games[2]["game"].whomst == 1
+        assert games[0].whomst == 3
+        assert games[1].whomst == 2
+        assert games[2].whomst == 1
 
     @pytest.mark.asyncio
     async def test_get_games_succeeds_move_hist(self, session):
         games = await crud.get_games(session, id_=1)
-        assert games[0]["move_hist"] == ["e4"]
+        assert games[0].move_hist == ["e4"]
 
 
 class TestDoMove:
@@ -403,9 +405,9 @@ class TestDoMove:
     ):
         # assert default game.state
         game = await crud.get_games(session, id_=game_id)
-        assert game[0]["game"].states == "{}"
+        assert game[0].states == "{}"
         assert (
-            game[0]["game"].fen
+            game[0].fen
             == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
         )
 
@@ -413,19 +415,19 @@ class TestDoMove:
 
         game_after_move = await crud.get_games(session, id_=game_id)
         assert (
-            game_after_move[0]["game"].fen
+            game_after_move[0].fen
             == "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
         )
         assert (
-            game_after_move[0]["game"].states
+            game_after_move[0].states
             == '{ "-1219502575": "2", "-1950040747": "2", "1823187191": "1", "1287635123": "1" }'
         )
-        assert game_after_move[0]["game"].last_active != None
-        assert game_after_move[0]["game"].winner == None
-        assert game_after_move[0]["game"].result == None
-        assert game_after_move[0]["game"].is_active == True
+        assert game_after_move[0].last_active != None
+        assert game_after_move[0].winner == None
+        assert game_after_move[0].result == None
+        assert game_after_move[0].is_active == True
         # assert that it is blacks turn after white moves
-        assert game_after_move[0]["game"].whomst == 2
+        assert game_after_move[0].whomst == 2
 
     @pytest.mark.parametrize(
         "game_id, user_id, whomst, move, states, fen, status",
@@ -460,10 +462,10 @@ class TestDoMove:
         await crud.do_move(session, game_id, user_id, whomst, move, states, fen, status)
         game_after_move = await crud.get_games(session, id_=game_id)
 
-        assert game_after_move[0]["game"].last_active != None
-        assert game_after_move[0]["game"].winner == user_id
-        assert game_after_move[0]["game"].is_active == False
-        assert game_after_move[0]["game"].result == models.GameResult.CHECKMATE
+        assert game_after_move[0].last_active != None
+        assert game_after_move[0].winner == user_id
+        assert game_after_move[0].is_active == False
+        assert game_after_move[0].result == models.GameResult.CHECKMATE
 
 
 class TestCreateChallenge:
@@ -504,14 +506,10 @@ class TestGetChallenges:
         rows = await crud.get_challenges(session, id_=created.id_)
         assert len(rows) == 1
 
-        row = rows[0]
-        assert "challenge" in row
-        assert "requester_username" in row
-
-        challenge = row["challenge"]
+        challenge = rows[0]
         assert challenge.id_ == created.id_
         assert challenge.requester_id == requester_id
-        assert row["requester_username"] == requester.name
+        assert challenge.requester_username == requester.name
 
     @pytest.mark.asyncio
     async def test_get_challenges_filters(self, session, restore_fake_data_after):
@@ -521,20 +519,20 @@ class TestGetChallenges:
         c2 = await crud.create_challenge(session, requester_id)
 
         rows = await crud.get_challenges(session, requester_id=requester_id)
-        ids = [r["challenge"].id_ for r in rows]
+        ids = [r.id_ for r in rows]
         assert c1.id_ in ids
         assert c2.id_ in ids
 
         # filter by id_
         rows = await crud.get_challenges(session, id_=c1.id_)
         assert len(rows) == 1
-        assert rows[0]["challenge"].id_ == c1.id_
+        assert rows[0].id_ == c1.id_
 
         # filter by status
         rows = await crud.get_challenges(
             session, status=models.ChallengeRequestStatus.PENDING
         )
-        pending_ids = [r["challenge"].id_ for r in rows]
+        pending_ids = [r.id_ for r in rows]
         assert c1.id_ in pending_ids
         assert c2.id_ in pending_ids
 
@@ -566,7 +564,7 @@ class TestAcceptChallenge:
         requester_id = 1
         acceptor_id = 2
 
-        challenge = await crud.create_challenge(sesssion, requester_id)
+        challenge = await crud.create_challenge(session, requester_id)
         assert challenge.status == models.ChallengeRequestStatus.PENDING
         assert challenge.fulfilled_by is None
         assert challenge.game_id is None
@@ -583,7 +581,7 @@ class TestAcceptChallenge:
 
         rows = await crud.get_challenges(session, id_=challenge.id_, limit=1)
         assert len(rows) == 1
-        updated = rows[0]["challenge"]
+        updated = rows[0]
 
         assert updated.status == models.ChallengeRequestStatus.ACCEPTED
         assert updated.fulfilled_by == acceptor_id
@@ -615,10 +613,10 @@ class TestCancelChallenge:
 
         rows = await crud.get_challenges(session, id_=challenge.id_, limit=1)
         assert len(rows) == 1
-        assert rows[0]["challenge"].status == models.ChallengeRequestStatus.PENDING
+        assert rows[0].status == models.ChallengeRequestStatus.PENDING
 
         assert await crud.cancel_challenge(session, challenge.id_) is True
 
         rows = await crud.get_challenges(session, id_=challenge.id_, limit=1)
         assert len(rows) == 1
-        assert rows[0]["challenge"].status == models.ChallengeRequestStatus.CANCELLED
+        assert rows[0].status == models.ChallengeRequestStatus.CANCELLED

@@ -166,33 +166,13 @@ def fake_game_data():
     return copy(FAKE_GAME_DATA)
 
 
-@pytest_asyncio.fixture(autouse=True)
-async def override_db_session_dependency():
-    """
-    db.session() is an @asynccontextmanager, so calling it returns a context manager
-    object (not an async-generator dependency). FastAPI's Depends() expects a
-    yield-style dependency it can drive.
-
-    In tests, we override db.session with a wrapper that:
-      - enters your context manager (async with db.session())
-      - yields a real AsyncSession to the endpoint
-      - exits the context manager after the request (triggering your commit)
-    """
-
-    async def _override():
-        async with db.session() as sesh:
-            yield sesh
-
-    app.dependency_overrides[db.session] = _override
-    yield
-    app.dependency_overrides.pop(db.session, None)
-
-
 @pytest_asyncio.fixture
 async def session() -> AsyncSession:
     async with db.session() as sesh:
-        yield sesh
-
+        try:
+            yield sesh
+        finally: await sesh.rollback()
+        
 
 @pytest_asyncio.fixture
 async def token(session: AsyncSession) -> str:
