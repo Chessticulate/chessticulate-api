@@ -97,7 +97,7 @@ class TestCreateUser:
             )
 
     @pytest.mark.asyncio
-    async def test_create_user_succeeds(self, session, restore_fake_data_after):
+    async def test_create_user_succeeds(self, session):
         user = await crud.create_user(
             session, "unique", "unique@fakeemail.com", SecretStr("password")
         )
@@ -113,7 +113,7 @@ class TestDeleteUser:
 
     @pytest.mark.asyncio
     async def test_delete_user_succeeds_and_cant_be_deleted_again(
-        self, session, restore_fake_data_after, fake_user_data
+        self, session, fake_user_data
     ):
         users = await crud.get_users(session, name=fake_user_data[0]["name"])
         assert len(users) == 1
@@ -139,9 +139,7 @@ class TestLogin:
         assert token is None
 
     @pytest.mark.asyncio
-    async def test_login_fails_user_deleted(
-        self, session, fake_user_data, restore_fake_data_after
-    ):
+    async def test_login_fails_user_deleted(self, session, fake_user_data):
         result = await crud.get_users(session, name=fake_user_data[0]["name"])
         assert len(result) == 1
         user = result[0]
@@ -181,9 +179,7 @@ class TestCreateInvitation:
             invitation = await crud.create_invitation(session, invitor.id_, 42069)
 
     @pytest.mark.asyncio
-    async def test_create_invitation_succeeds(
-        self, session, restore_fake_data_after, fake_user_data
-    ):
+    async def test_create_invitation_succeeds(self, session, fake_user_data):
         result = await crud.get_users(session, name=fake_user_data[0]["name"])
         assert len(result) == 1
         invitor = result[0]
@@ -247,9 +243,7 @@ class TestCancelInvitation:
 
     @pytest.mark.parametrize("id_", (4,))
     @pytest.mark.asyncio
-    async def test_cancel_invitation_succeeds(
-        self, session, restore_fake_data_after, id_
-    ):
+    async def test_cancel_invitation_succeeds(self, session, id_):
         result = await crud.get_invitations(session, id_=id_)
         assert len(result) == 1
         invitation = result[0]
@@ -276,9 +270,7 @@ class TestDeclineInvitation:
 
     @pytest.mark.parametrize("id_", (4,))
     @pytest.mark.asyncio
-    async def test_decline_invitation_succeeds(
-        self, session, restore_fake_data_after, id_
-    ):
+    async def test_decline_invitation_succeeds(self, session, id_):
         result = await crud.get_invitations(session, id_=id_)
         assert len(result) == 1
         invitation = result[0]
@@ -305,9 +297,7 @@ class TestAcceptInvitation:
 
     @pytest.mark.parametrize("id_", (4,))
     @pytest.mark.asyncio
-    async def test_accept_invitation_succeeds(
-        self, session, restore_fake_data_after, id_
-    ):
+    async def test_accept_invitation_succeeds(self, session, id_):
         result = await crud.get_invitations(session, id_=id_)
         assert len(result) == 1
         invitation = result[0]
@@ -401,15 +391,11 @@ class TestDoMove:
         states,
         fen,
         status,
-        restore_fake_data_after,
     ):
         # assert default game.state
         game = await crud.get_games(session, id_=game_id)
         assert game[0].states == "{}"
-        assert (
-            game[0].fen
-            == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-        )
+        assert game[0].fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
         await crud.do_move(session, game_id, user_id, whomst, move, states, fen, status)
 
@@ -454,7 +440,6 @@ class TestDoMove:
         states,
         fen,
         status,
-        restore_fake_data_after,
     ):
         # assert default game.state
         game = await crud.get_games(session, id_=game_id)
@@ -475,7 +460,7 @@ class TestCreateChallenge:
             await crud.create_challenge(session, 42069)
 
     @pytest.mark.asyncio
-    async def test_create_challenge_succeeds(self, session, restore_fake_data_after):
+    async def test_create_challenge_succeeds(self, session):
         requester_id = 1
 
         challenge = await crud.create_challenge(session, requester_id)
@@ -495,9 +480,7 @@ class TestGetChallenges:
         assert challenges == []
 
     @pytest.mark.asyncio
-    async def test_get_challenges_succeeds_includes_username(
-        self, session, restore_fake_data_after
-    ):
+    async def test_get_challenges_succeeds_includes_username(self, session):
         requester_id = 1
         requester = (await crud.get_users(session, id_=requester_id))[0]
 
@@ -512,7 +495,7 @@ class TestGetChallenges:
         assert challenge.requester_username == requester.name
 
     @pytest.mark.asyncio
-    async def test_get_challenges_filters(self, session, restore_fake_data_after):
+    async def test_get_challenges_filters(self, session):
         requester_id = 1
 
         c1 = await crud.create_challenge(session, requester_id)
@@ -544,7 +527,8 @@ class TestAcceptChallenge:
 
     @pytest.mark.asyncio
     async def test_accept_challenge_fails_not_pending(
-        self, session, restore_fake_data_after
+        self,
+        session,
     ):
         requester_id = 1
         acceptor_id = 2
@@ -559,7 +543,8 @@ class TestAcceptChallenge:
 
     @pytest.mark.asyncio
     async def test_accept_challenge_succeeds_sets_fields_and_creates_game(
-        self, session, restore_fake_data_after
+        self,
+        session,
     ):
         requester_id = 1
         acceptor_id = 2
@@ -595,7 +580,8 @@ class TestCancelChallenge:
 
     @pytest.mark.asyncio
     async def test_cancel_challenge_fails_not_pending(
-        self, session, restore_fake_data_after
+        self,
+        session,
     ):
         requester_id = 1
         acceptor_id = 2
@@ -607,7 +593,7 @@ class TestCancelChallenge:
         assert await crud.cancel_challenge(session, challenge.id_) is False
 
     @pytest.mark.asyncio
-    async def test_cancel_challenge_succeeds(self, session, restore_fake_data_after):
+    async def test_cancel_challenge_succeeds(self, session):
         requester_id = 1
         challenge = await crud.create_challenge(session, requester_id)
 

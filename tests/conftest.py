@@ -6,8 +6,8 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
 
 from chessticulate_api import app, config, crud, db, models
 
@@ -99,6 +99,25 @@ FAKE_INVITATION_DATA = [
     },
 ]
 
+FAKE_CHALLENGE_DATA = [
+    {
+        "requester_id": 1,
+        "game_type": models.GameType.CHESS,
+        "status": models.ChallengeRequestStatus.PENDING,
+    },
+    {
+        "requester_id": 2,
+        "game_type": models.GameType.CHESS,
+        "status": models.ChallengeRequestStatus.PENDING,
+    },
+    {
+        "requester_id": 2,
+        "fulfilled_by": 3,
+        "game_type": models.GameType.CHESS,
+        "status": models.ChallengeRequestStatus.ACCEPTED,
+    },
+]
+
 
 FAKE_GAME_DATA = [
     {
@@ -168,11 +187,15 @@ def fake_game_data():
 
 @pytest_asyncio.fixture
 async def session() -> AsyncSession:
-    async with db.session() as sesh:
+    async with db.async_session() as sesh:
         try:
             yield sesh
-        finally: await sesh.rollback()
-        
+        finally:
+            try:
+                await sesh.rollback()
+            except SQLAlchemyError:
+                pass
+
 
 @pytest_asyncio.fixture
 async def token(session: AsyncSession) -> str:
@@ -211,6 +234,12 @@ async def _init_fake_data():
         for data in FAKE_INVITATION_DATA:
             invitation = models.Invitation(**data)
             session.add(invitation)
+        await session.commit()
+
+    async with db.async_session() as session:
+        for data in FAKE_CHALLENGE_DATA:
+            challenge = models.ChallengeRequest(**data)
+            session.add(challenge)
         await session.commit()
 
     async with db.async_session() as session:

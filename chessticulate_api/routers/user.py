@@ -15,14 +15,14 @@ user_router = APIRouter(prefix="/users")
 @user_router.get("")
 async def get_users(
     session: Annotated[AsyncSession, Depends(db.session)],
-    _: Annotated[dict, Depends(security.get_credentials)],
+    _: Annotated[schemas.Credentials, Depends(security.get_credentials)],
     user_id: int | None = None,
     user_name: str | None = None,
     skip: int = 0,
     limit: Annotated[int, Field(gt=0, le=50)] = 10,
     order_by: str = "date_joined",
     reverse: bool = False,
-) -> schemas.GetUserResponse:
+) -> list[schemas.GetUserResponse]:
     """Retrieve user info."""
     args = {"skip": skip, "limit": limit, "order_by": order_by, "reverse": reverse}
 
@@ -31,9 +31,9 @@ async def get_users(
     if user_name:
         args["name"] = user_name
 
-    return schemas.GetUserResponse(
-        users=[vars(user) for user in await crud.get_users(session, **args)]
-    )
+    users = await crud.get_users(session, **args)
+
+    return [schemas.GetUserResponse(**vars(user)) for user in users]
 
 
 @user_router.get("/name/{name}", status_code=200)
@@ -63,11 +63,11 @@ async def email_exists(
 @user_router.get("/self")
 async def get_self(
     session: Annotated[AsyncSession, Depends(db.session)],
-    credentials: Annotated[dict, Depends(security.get_credentials)],
+    credentials: Annotated[schemas.Credentials, Depends(security.get_credentials)],
 ) -> schemas.GetOwnUserResponse:
     """Retrieve own user info."""
 
-    user = await crud.get_users(session, id_=credentials["user_id"])
+    user = await crud.get_users(session, id_=credentials.user_id)
 
     return schemas.GetOwnUserResponse(**vars(user[0]))
 
@@ -75,9 +75,8 @@ async def get_self(
 @user_router.delete("/self", status_code=204)
 async def delete_user(
     session: Annotated[AsyncSession, Depends(db.session)],
-    credentials: Annotated[dict, Depends(security.get_credentials)],
+    credentials: Annotated[schemas.Credentials, Depends(security.get_credentials)],
 ):
     """Delete own user."""
-    async with session.begin():
-        user_id = credentials["user_id"]
-        await crud.delete_user(session, user_id)
+    user_id = credentials.user_id
+    await crud.delete_user(session, user_id)

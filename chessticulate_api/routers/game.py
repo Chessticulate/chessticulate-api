@@ -18,7 +18,7 @@ game_router = APIRouter(prefix="/games")
 @game_router.get("")
 async def get_games(
     session: Annotated[AsyncSession, Depends(db.session)],
-    _: Annotated[dict, Depends(security.get_credentials)],
+    _: Annotated[schemas.Credentials, Depends(security.get_credentials)],
     game_id: int | None = None,
     player_id: int | None = None,
     invitation_id: int | None = None,
@@ -30,7 +30,7 @@ async def get_games(
     skip: int = 0,
     limit: Annotated[int, Field(gt=0, le=50)] = 10,
     reverse: bool = False,
-) -> schemas.GetGameResponse:
+) -> list[schemas.GetGameResponse]:
     """Retrieve a list of games"""
     args = {"skip": skip, "limit": limit, "reverse": reverse}
 
@@ -52,15 +52,7 @@ async def get_games(
         args["is_active"] = is_active
     games = await crud.get_games(session, **args)
 
-    result = [
-        schemas.GetGameResponse(
-            **vars(game_data["game"]),
-            white_username=game_data["white_username"],
-            black_username=game_data["black_username"],
-            move_hist=game_data["move_hist"],
-        )
-        for game_data in games
-    ]
+    result = [schemas.GetGameResponse(**vars(game)) for game in games]
 
     return result
 
@@ -70,57 +62,56 @@ async def get_games(
 async def move(
     session: Annotated[AsyncSession, Depends(db.session)],
     request: Request,
-    credentials: Annotated[dict, Depends(security.get_credentials)],
+    credentials: Annotated[schemas.Credentials, Depends(security.get_credentials)],
     game_id: int,
     payload: schemas.DoMoveRequest,
 ) -> schemas.DoMoveResponse:
     """Attempt a move on a given game"""
 
-    async with session.begin():
-        user_id = credentials["user_id"]
-        games = await crud.get_games(session, id_=game_id)
+    user_id = credentials.user_id
+    games = await crud.get_games(session, id_=game_id)
 
-        if not games:
-            raise HTTPException(status_code=404, detail="invalid game id")
+    if not games:
+        raise HTTPException(status_code=404, detail="invalid game id")
 
-        game = games[0]["game"]
+    game = games[0]
 
-        if user_id not in [game.white, game.black]:
-            raise HTTPException(
-                status_code=403,
-                detail=f"user '{user_id}' not a player in game '{game_id}'",
-            )
-
-        if user_id != game.whomst:
-            raise HTTPException(
-                status_code=400,
-                detail=f"it is not the turn of user with id '{user_id}'",
-            )
-
-        try:
-            response = await workers_service.do_move(
-                game.fen, payload.move, json.loads(game.states)
-            )
-        except workers_service.ClientRequestError as e:
-            raise HTTPException(status_code=400, detail=str(e)) from e
-        except workers_service.ServerRequestError as e:
-            raise HTTPException(status_code=500) from e
-
-        status = response["status"]
-        states = response["states"]
-        fen = response["fen"]
-        whomst = game.white if game.whomst == game.black else game.black
-
-        updated_game = await crud.do_move(
-            session,
-            game_id,
-            user_id,
-            whomst,
-            payload.move,
-            json.dumps(states),
-            fen,
-            status,
+    if user_id not in [game.white, game.black]:
+        raise HTTPException(
+            status_code=403,
+            detail=f"user '{user_id}' not a player in game '{game_id}'",
         )
+
+    if user_id != game.whomst:
+        raise HTTPException(
+            status_code=400,
+            detail=f"it is not the turn of user with id '{user_id}'",
+        )
+
+    try:
+        response = await workers_service.do_move(
+            game.fen, payload.move, json.loads(game.states)
+        )
+    except workers_service.ClientRequestError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except workers_service.ServerRequestError as e:
+        raise HTTPException(status_code=500) from e
+
+    status = response["status"]
+    states = response["states"]
+    fen = response["fen"]
+    whomst = game.white if game.whomst == game.black else game.black
+
+    updated_game = await crud.do_move(
+        session,
+        game_id,
+        user_id,
+        whomst,
+        payload.move,
+        json.dumps(states),
+        fen,
+        status,
+    )
 
     # publish update to redis
     redis: Redis = request.app.state.redis
@@ -141,7 +132,7 @@ async def move(
 # the front end will hit this "long get" and once it has it will recieve game updates
 @game_router.get("/{game_id}/update")
 async def game_update(
-    _: Annotated[dict, Depends(security.get_credentials)],
+    _: Annotated[schemas.Credentials, Depends(security.get_credentials)],
     request: Request,
     game_id: int,
 ) -> StreamingResponse:
@@ -184,26 +175,25 @@ async def game_update(
 @game_router.post("/{game_id}/forfeit")
 async def forfeit(
     session: Annotated[AsyncSession, Depends(db.session)],
-    credentials: Annotated[dict, Depends(security.get_credentials)],
+    credentials: Annotated[schemas.Credentials, Depends(security.get_credentials)],
     game_id: int,
 ) -> schemas.ForfeitResponse:
     """Forfeit a given game"""
 
-    async with session.begin():
-        user_id = credentials["user_id"]
-        games = await crud.get_games(session, id_=game_id)
+    user_id = credentials.user_id
+    games = await crud.get_games(session, id_=game_id)
 
-        if not games:
-            raise HTTPException(status_code=404, detail="invalid game id")
+    if not games:
+        raise HTTPException(status_code=404, detail="invalid game id")
 
-        game = games[0]["game"]
+    game = games[0]
 
-        if user_id not in [game.white, game.black]:
-            raise HTTPException(
-                status_code=403,
-                detail=f"user '{user_id}' not a player in game '{game_id}'",
-            )
+    if user_id not in [game.white, game.black]:
+        raise HTTPException(
+            status_code=403,
+            detail=f"user '{user_id}' not a player in game '{game_id}'",
+        )
 
-        quiter = await crud.forfeit(session, game_id, user_id)
+    quiter = await crud.forfeit(session, game_id, user_id)
 
     return schemas.ForfeitResponse(**vars(quiter))

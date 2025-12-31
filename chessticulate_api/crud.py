@@ -2,7 +2,7 @@
 
 import random
 from datetime import datetime, timedelta, timezone
-from typing import TypeAlias, NamedTuple
+from typing import TypeAlias
 
 import bcrypt
 import jwt
@@ -11,7 +11,7 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from chessticulate_api import db, models, schemas
+from chessticulate_api import models, schemas
 from chessticulate_api.config import CONFIG
 
 WhiteUsername: TypeAlias = str
@@ -148,6 +148,7 @@ async def create_invitation(
     return invitation
 
 
+# pylint: disable=too-many-locals
 async def get_invitations(
     session: AsyncSession,
     skip: int = 0,
@@ -343,6 +344,7 @@ async def get_games(
 
     return games
 
+
 # pylint: disable=too-many-arguments
 async def do_move(
     session: AsyncSession,
@@ -407,8 +409,7 @@ async def do_move(
 async def forfeit(session: AsyncSession, id_: int, user_id: int) -> models.Game:
     """Forefeit game"""
 
-    row = (await get_games(session, id_=id_))[0]
-    game = row.game
+    game = (await get_games(session, id_=id_))[0]
 
     winner = game.white if user_id == game.black else game.black
 
@@ -478,7 +479,7 @@ async def get_challenges(
     for challenge, requester_username in rows:
         challenge.requester_username = requester_username
         challenges.append(challenge)
-    
+
     return challenges
 
 

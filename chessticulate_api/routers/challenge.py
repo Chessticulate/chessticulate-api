@@ -18,18 +18,17 @@ async def create_challenge(
 ) -> schemas.CreateChallengeResponse:
     """Create a new challenge request"""
 
-    async with session.begin():
-        if not (
-            await crud.get_challenges(
-                session,
-                requester_id=credentials.user_id,
-                status=models.ChallengeRequestStatus.PENDING,
-            )
-        ):
-            raise HTTPException(
-                status_code=409, detail="user already has pending challenge request"
-            )
-        challenge = await crud.create_challenge(session, credentials.user_id)
+    if not (
+        await crud.get_challenges(
+            session,
+            requester_id=credentials.user_id,
+            status=models.ChallengeRequestStatus.PENDING,
+        )
+    ):
+        raise HTTPException(
+            status_code=409, detail="user already has pending challenge request"
+        )
+    challenge = await crud.create_challenge(session, credentials.user_id)
     return schemas.CreateChallengeResponse(**vars(challenge))
 
 
@@ -63,11 +62,7 @@ async def get_challenges(
     )
 
     result = [
-        schemas.GetChallengeResponse(
-            **vars(challenge_data[0]),
-            requester_username=challenge_data[1],
-        )
-        for challenge_data in challenges
+        schemas.GetChallengeResponse(**vars(challenge)) for challenge in challenges
     ]
 
     return result
@@ -81,43 +76,41 @@ async def accept_challenge(
 ) -> schemas.AcceptChallengeResponse:
     """Accept a challenge request"""
 
-    async with session.begin():
-        # does challenge exist
-        challenge_list = await crud.get_challenges(
-            session,
-            id_=challenge_id,
-            limit=1,
-            status=models.ChallengeRequestStatus.PENDING,
+    # does challenge exist
+    challenge_list = await crud.get_challenges(
+        session,
+        id_=challenge_id,
+        status=models.ChallengeRequestStatus.PENDING,
+    )
+    if not challenge_list:
+        raise HTTPException(status_code=404, detail="challenge does not exist")
+
+    challenge = challenge_list[0]
+
+    # is this a user accepting own challenge
+    if credentials.user_id == challenge.requester_id:
+        raise HTTPException(status_code=400, detail="cannot accept own challenge")
+
+    # does creator still exist
+    user = await crud.get_users(session, id_=challenge.requester_id)
+    if user[0].deleted:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"user with ID '{challenge.requester_id}' who made challenge with id"
+                f" '{challenge_id}' does not exist"
+            ),
         )
-        if not challenge_list:
-            raise HTTPException(status_code=404, detail="challenge does not exist")
 
-        challenge, _ = challenge_list[0]
-
-        # is this a user accepting own challenge
-        if credentials.user_id == challenge.requester_id:
-            raise HTTPException(status_code=400, detail="cannot accept own challenge")
-
-        # does creator still exist
-        user = await crud.get_users(session, id_=challenge.requester_id)
-        if user[0].deleted:
-            raise HTTPException(
-                status_code=404,
-                detail=(
-                    f"user with ID '{challenge.requester_id}' who made challenge with id"
-                    f" '{challenge_id}' does not exist"
-                ),
-            )
-
-        if not (
-            result := await crud.accept_challenge(
-                session, challenge_id, credentials.user_id
-            )
-        ):
-            # challenge was accepted while we were processing this request
-            raise HTTPException(
-                status_code=404, detail="sorry, this challenge is no longer available"
-            )
+    if not (
+        result := await crud.accept_challenge(
+            session, challenge_id, credentials.user_id
+        )
+    ):
+        # challenge was accepted while we were processing this request
+        raise HTTPException(
+            status_code=404, detail="sorry, this challenge is no longer available"
+        )
 
     return schemas.AcceptChallengeResponse(game_id=result.id_)
 
@@ -130,22 +123,21 @@ async def cancel_challenge(
 ):
     """Cancel a challenge request"""
 
-    async with session.begin():
-        challenge_list = await crud.get_challenges(
-            session, id_=challenge_id, status=models.ChallengeRequestStatus.PENDING
+    challenge_list = await crud.get_challenges(
+        session, id_=challenge_id, status=models.ChallengeRequestStatus.PENDING
+    )
+
+    # does challenge exist
+    if not challenge_list:
+        raise HTTPException(status_code=404, detail="challenge does not exist")
+
+    challenge = challenge_list[0]
+
+    # only the creator can cancel the challenge
+    if credentials.user_id != challenge.requester_id:
+        raise HTTPException(
+            status_code=403, detail="can't cancel someone else's challenge"
         )
 
-        # does challenge exist
-        if not challenge_list:
-            raise HTTPException(status_code=404, detail="challenge does not exist")
-
-        challenge, _ = challenge_list[0]
-
-        # only the creator can cancel the challenge
-        if credentials.user_id != challenge.requester_id:
-            raise HTTPException(
-                status_code=403, detail="can't cancel someone else's challenge"
-            )
-
-        if not await crud.cancel_challenge(session, challenge_id):
-            raise HTTPException(status_code=500)
+    if not await crud.cancel_challenge(session, challenge_id):
+        raise HTTPException(status_code=500)
