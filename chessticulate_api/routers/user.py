@@ -11,7 +11,7 @@ from chessticulate_api import crud, db, schemas, security
 user_router = APIRouter(prefix="/users")
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments, disable=too-many-positional-arguments
 @user_router.get("")
 async def get_users(
     session: Annotated[AsyncSession, Depends(db.session)],

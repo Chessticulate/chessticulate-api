@@ -32,7 +32,7 @@ async def create_challenge(
     return schemas.CreateChallengeResponse(**vars(challenge))
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments, disable=too-many-positional-arguments
 @challenge_router.get("")
 async def get_challenges(
     session: Annotated[AsyncSession, Depends(db.session)],

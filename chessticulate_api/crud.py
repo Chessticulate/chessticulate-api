@@ -345,7 +345,7 @@ async def get_games(
     return games
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments, disable=too-many-positional-arguments
 async def do_move(
     session: AsyncSession,
     id_: int,

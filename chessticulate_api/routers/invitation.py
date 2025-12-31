@@ -40,7 +40,7 @@ async def create_invitation(
     return schemas.CreateInvitationResponse(**vars(result))
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments, disable=too-many-positional-arguments
 @invitation_router.get("")
 async def get_invitations(
     session: Annotated[AsyncSession, Depends(db.session)],
