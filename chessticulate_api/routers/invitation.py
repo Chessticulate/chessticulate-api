@@ -95,6 +95,7 @@ async def accept_invitation(
         invitation_list := await crud.get_invitations(
             session,
             id_=invitation_id,
+            lock_rows=True,
         )
     ):
         raise HTTPException(
@@ -112,7 +113,7 @@ async def accept_invitation(
             ),
         )
 
-    user = await crud.get_users(session, id_=invitation.from_id)
+    user = await crud.get_users(session, id_=invitation.from_id, lock_rows=True)
     if user[0].deleted:
         raise HTTPException(
             status_code=404,
@@ -146,7 +147,9 @@ async def decline_invitation(
 ):
     """Decline an invitation."""
 
-    invitation_list = await crud.get_invitations(session, id_=invitation_id)
+    invitation_list = await crud.get_invitations(
+        session, id_=invitation_id, lock_rows=True
+    )
 
     if not invitation_list:
         raise HTTPException(
@@ -164,7 +167,7 @@ async def decline_invitation(
             ),
         )
 
-    user = await crud.get_users(session, id_=invitation.from_id)
+    user = await crud.get_users(session, id_=invitation.from_id, lock_rows=True)
     if user[0].deleted:
         raise HTTPException(
             status_code=404,
@@ -195,7 +198,9 @@ async def cancel_invitation(
 ):
     """Cancel an invitation."""
 
-    invitation_list = await crud.get_invitations(session, id_=invitation_id)
+    invitation_list = await crud.get_invitations(
+        session, id_=invitation_id, lock_rows=True
+    )
 
     if not invitation_list:
         raise HTTPException(

@@ -81,6 +81,7 @@ async def accept_challenge(
         session,
         id_=challenge_id,
         status=models.ChallengeRequestStatus.PENDING,
+        lock_rows=True,
     )
     if not challenge_list:
         raise HTTPException(status_code=404, detail="challenge does not exist")
@@ -92,7 +93,7 @@ async def accept_challenge(
         raise HTTPException(status_code=400, detail="cannot accept own challenge")
 
     # does creator still exist
-    user = await crud.get_users(session, id_=challenge.requester_id)
+    user = await crud.get_users(session, id_=challenge.requester_id, lock_rows=True)
     if user[0].deleted:
         raise HTTPException(
             status_code=404,
@@ -124,7 +125,10 @@ async def cancel_challenge(
     """Cancel a challenge request"""
 
     challenge_list = await crud.get_challenges(
-        session, id_=challenge_id, status=models.ChallengeRequestStatus.PENDING
+        session,
+        id_=challenge_id,
+        status=models.ChallengeRequestStatus.PENDING,
+        lock_rows=True,
     )
 
     # does challenge exist

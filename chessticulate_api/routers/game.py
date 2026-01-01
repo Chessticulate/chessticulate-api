@@ -181,7 +181,7 @@ async def forfeit(
     """Forfeit a given game"""
 
     user_id = credentials.user_id
-    games = await crud.get_games(session, id_=game_id)
+    games = await crud.get_games(session, id_=game_id, lock_rows=True)
 
     if not games:
         raise HTTPException(status_code=404, detail="invalid game id")
@@ -194,6 +194,6 @@ async def forfeit(
             detail=f"user '{user_id}' not a player in game '{game_id}'",
         )
 
-    quiter = await crud.forfeit(session, game_id, user_id)
+    quiter = await crud.forfeit(session, user_id, game)
 
     return schemas.ForfeitResponse(**vars(quiter))

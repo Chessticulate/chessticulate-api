@@ -34,12 +34,14 @@ def _check_password(pswd: SecretStr, pswd_hash: str) -> bool:
     )
 
 
+# pylint: disable=too-many-arguments, disable=too-many-positional-arguments
 async def get_users(
     session: AsyncSession,
     skip: int = 0,
     limit: int = 10,
     order_by: str = "date_joined",
     reverse: bool = False,
+    lock_rows: bool = False,
     **kwargs,
 ) -> list[models.User]:
     """
@@ -60,6 +62,9 @@ async def get_users(
     order_attr = getattr(models.User, order_by)
     stmt = stmt.order_by(order_attr.desc() if reverse else order_attr.asc())
     stmt = stmt.offset(skip).limit(limit)
+
+    if lock_rows:
+        stmt = stmt.with_for_update()
 
     return (await session.execute(stmt)).scalars().all()
 
@@ -149,12 +154,14 @@ async def create_invitation(
 
 
 # pylint: disable=too-many-locals
+# pylint: disable=too-many-arguments, disable=too-many-positional-arguments
 async def get_invitations(
     session: AsyncSession,
     skip: int = 0,
     limit: int = 10,
     order_by: str = "date_sent",
     reverse: bool = False,
+    lock_rows: bool = False,
     **kwargs,
 ) -> list[models.Invitation]:
     """
@@ -189,6 +196,9 @@ async def get_invitations(
     stmt = stmt.order_by(order_attr)
 
     stmt = stmt.offset(skip).limit(limit)
+
+    if lock_rows:
+        stmt = stmt.with_for_update()
 
     rows = (await session.execute(stmt)).all()
 
@@ -279,12 +289,14 @@ async def decline_invitation(session: AsyncSession, id_: int) -> bool:
 
 
 # pylint: disable=too-many-locals
+# pylint: disable=too-many-arguments, disable=too-many-positional-arguments
 async def get_games(
     session: AsyncSession,
     skip: int = 0,
     limit: int = 10,
     order_by: str = "last_active",
     reverse: bool = False,
+    lock_rows: bool = False,
     **kwargs,
 ) -> list[models.Game]:
     """
@@ -327,6 +339,9 @@ async def get_games(
     stmt = stmt.order_by(order_by_attr.desc() if reverse else order_by_attr.asc())
 
     stmt = stmt.offset(skip).limit(limit)
+
+    if lock_rows:
+        stmt = stmt.with_for_update()
 
     rows = (await session.execute(stmt)).all()
 
@@ -406,16 +421,16 @@ async def do_move(
     ).one()[0]
 
 
-async def forfeit(session: AsyncSession, id_: int, user_id: int) -> models.Game:
+async def forfeit(
+    session: AsyncSession, user_id: int, game: models.Game
+) -> models.Game:
     """Forefeit game"""
-
-    game = (await get_games(session, id_=id_))[0]
 
     winner = game.white if user_id == game.black else game.black
 
     stmt = (
         update(models.Game)
-        .where(models.Game.id_ == id_)
+        .where(models.Game.id_ == game.id_)
         .values(
             winner=winner,
             result=models.GameResult.RESIGNATION,
@@ -427,7 +442,7 @@ async def forfeit(session: AsyncSession, id_: int, user_id: int) -> models.Game:
     await session.execute(stmt)
 
     return (
-        await session.execute(select(models.Game).where(models.Game.id_ == id_))
+        await session.execute(select(models.Game).where(models.Game.id_ == game.id_))
     ).one()[0]
 
 
@@ -453,6 +468,7 @@ async def get_challenges(
     limit: int = 10,
     order_by: str = "created_at",
     reverse: bool = False,
+    lock_rows: bool = False,
     **kwargs,
 ) -> list[models.ChallengeRequest]:
     """Retrieve a list of challenge requests along with the requester's username"""
@@ -472,6 +488,9 @@ async def get_challenges(
     stmt = stmt.order_by(order_attr)
 
     stmt = stmt.offset(skip).limit(limit)
+
+    if lock_rows:
+        stmt = stmt.with_for_update()
 
     rows = (await session.execute(stmt)).all()
 
