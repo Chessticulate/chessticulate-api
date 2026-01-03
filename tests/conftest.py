@@ -1,12 +1,15 @@
 from copy import copy
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
 from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from chessticulate_api import config, crud, db, models
+from chessticulate_api import app, config, crud, db, models
 
 FAKE_USER_DATA = [
     {
@@ -96,6 +99,25 @@ FAKE_INVITATION_DATA = [
     },
 ]
 
+FAKE_CHALLENGE_DATA = [
+    {
+        "requester_id": 1,
+        "game_type": models.GameType.CHESS,
+        "status": models.ChallengeRequestStatus.PENDING,
+    },
+    {
+        "requester_id": 2,
+        "game_type": models.GameType.CHESS,
+        "status": models.ChallengeRequestStatus.PENDING,
+    },
+    {
+        "requester_id": 2,
+        "fulfilled_by": 3,
+        "game_type": models.GameType.CHESS,
+        "status": models.ChallengeRequestStatus.ACCEPTED,
+    },
+]
+
 
 FAKE_GAME_DATA = [
     {
@@ -143,8 +165,8 @@ FAKE_MOVE_DATA = [
 ]
 
 
-@pytest.fixture
-def fake_app_secret(scope="session", autouse=True):
+@pytest.fixture(scope="session", autouse=True)
+def fake_app_secret():
     config.CONFIG.jwt_secret = "fake_secret"
 
 
@@ -153,23 +175,43 @@ def fake_user_data():
     return copy(FAKE_USER_DATA)
 
 
-@pytest.fixture
-def fake_invitation_data(scope="session"):
+@pytest.fixture(scope="session")
+def fake_invitation_data():
     return copy(FAKE_INVITATION_DATA)
 
 
-@pytest.fixture
-def fake_game_data(scope="session"):
+@pytest.fixture(scope="session")
+def fake_game_data():
     return copy(FAKE_GAME_DATA)
 
 
 @pytest_asyncio.fixture
-async def token(scope="session"):
+async def session() -> AsyncSession:
+    async with db.async_session() as sesh:
+        try:
+            yield sesh
+        finally:
+            try:
+                await sesh.rollback()
+            except SQLAlchemyError:
+                pass
+
+
+@pytest_asyncio.fixture
+async def token(session: AsyncSession) -> str:
     fakeuser1 = FAKE_USER_DATA[0]
-    return await crud.login(fakeuser1["name"], SecretStr(fakeuser1["password"]))
+    token = await crud.login(
+        session,
+        fakeuser1["name"],
+        SecretStr(fakeuser1["password"]),
+    )
+    assert token is not None
+    return token
 
 
 async def _init_fake_data():
+    await db.async_engine.dispose()
+
     db.async_engine = db.create_async_engine(
         config.CONFIG.sql_conn_str, echo=config.CONFIG.sql_echo
     )
@@ -195,6 +237,12 @@ async def _init_fake_data():
         await session.commit()
 
     async with db.async_session() as session:
+        for data in FAKE_CHALLENGE_DATA:
+            challenge = models.ChallengeRequest(**data)
+            session.add(challenge)
+        await session.commit()
+
+    async with db.async_session() as session:
         for data in FAKE_GAME_DATA:
             game = models.Game(**data)
             session.add(game)
@@ -216,3 +264,12 @@ async def init_fake_data():
 async def restore_fake_data_after():
     yield
     await _init_fake_data()
+
+
+@pytest_asyncio.fixture
+async def client():
+    app.state.redis = AsyncMock(name="FakeRedis")
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        yield ac

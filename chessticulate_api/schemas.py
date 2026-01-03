@@ -88,12 +88,6 @@ class GetChallengeResponse(BaseModel):
     status: str
 
 
-class GetChallengeListResponse(RootModel):
-    """Pydantic model for returning a list of GetChallengeResponses"""
-
-    root: list[GetChallengeResponse]
-
-
 class AcceptChallengeResponse(BaseModel):
     """Pydantic model for accepting a challenge request"""
 
@@ -258,3 +252,11 @@ class ForfeitResponse(BaseModel):
     result: str | None = None
     winner: int | None = None
     fen: str
+
+
+class Credentials(BaseModel):
+    """User credentials model used for encoding/decoding JWTs"""
+
+    exp: datetime
+    user_name: str
+    user_id: int

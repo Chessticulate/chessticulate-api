@@ -1,16 +1,34 @@
 [project]
 name = "chessticulate-api"
-version = "0.14.0"
+version = "0.15.0"
 
 requires-python = ">=3.11"
-dependencies = ["fastapi[all]==0.124.4", "sqlalchemy >= 2", "httpx==0.27.2", "python-dotenv", "py-bcrypt", "pyjwt", "asyncpg", "aiosqlite", "redis"]
+dependencies = [
+    "fastapi[all]==0.124.4",
+    "sqlalchemy~=2.0",
+    "httpx==0.27.2",
+    "python-dotenv~=1.2",
+    "py-bcrypt==0.4",
+    "pyjwt~=2.10",
+    "asyncpg==0.31.0",
+    "redis~=7.1",
+]
 
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
-dev = ["black", "pylint", "pytest", "pytest-asyncio", "pytest-cov", "isort", "respx"]
+dev = [
+    "black",
+    "pylint==4.0.4",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "isort",
+    "respx==0.22.0",
+    "aiosqlite==0.21.0",
+]
 
 [project.scripts]
 chess-api = "chessticulate_api.__main__:main"
@@ -23,7 +41,7 @@ line_length = 88
 preview = true  # format long strings
 
 [tool.pylint]
-max-line-length = 88
+max-line-length = 89
 
 [tool.pytest.ini_options]
 addopts = "--cov=chessticulate_api"
