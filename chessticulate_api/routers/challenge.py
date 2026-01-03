@@ -18,12 +18,10 @@ async def create_challenge(
 ) -> schemas.CreateChallengeResponse:
     """Create a new challenge request"""
 
-    if not (
-        await crud.get_challenges(
-            session,
-            requester_id=credentials.user_id,
-            status=models.ChallengeRequestStatus.PENDING,
-        )
+    if await crud.get_challenges(
+        session,
+        requester_id=credentials.user_id,
+        status=models.ChallengeRequestStatus.PENDING,
     ):
         raise HTTPException(
             status_code=409, detail="user already has pending challenge request"
@@ -40,7 +38,7 @@ async def get_challenges(
     requester_id: int | None = None,
     responder_id: int | None = None,
     challenge_id: int | None = None,
-    status: str | None = None,
+    status: str | None = models.ChallengeRequestStatus.PENDING,
     skip: int = 0,
     limit: Annotated[int, Field(gt=0, le=50)] = 10,
     reverse: bool = False,
@@ -57,9 +55,7 @@ async def get_challenges(
         args["id_"] = challenge_id
     if status:
         args["status"] = status
-    challenges = await crud.get_challenges(
-        session, **args, status=models.ChallengeRequestStatus.PENDING
-    )
+    challenges = await crud.get_challenges(session, **args)
 
     result = [
         schemas.GetChallengeResponse(**vars(challenge)) for challenge in challenges

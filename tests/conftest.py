@@ -101,7 +101,7 @@ FAKE_INVITATION_DATA = [
 
 FAKE_CHALLENGE_DATA = [
     {
-        "requester_id": 1,
+        "requester_id": 3,
         "game_type": models.GameType.CHESS,
         "status": models.ChallengeRequestStatus.PENDING,
     },
