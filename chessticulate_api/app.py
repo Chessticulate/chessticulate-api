@@ -74,17 +74,16 @@ async def signup(
     payload: schemas.CreateUserRequest,
 ) -> schemas.GetOwnUserResponse:
     """Create a new user account."""
-    async with session.begin():
-        if await crud.get_users(session, name=payload.name):
-            raise HTTPException(
-                status_code=400, detail="user with same name already exists"
-            )
-        if await crud.get_users(session, name=payload.email):
-            raise HTTPException(
-                status_code=400, detail="user with same name already exists"
-            )
-        user = await crud.create_user(
-            session, payload.name, payload.email, payload.password
+    if await crud.get_users(session, name=payload.name):
+        raise HTTPException(
+            status_code=400, detail="user with same name already exists"
         )
+    if await crud.get_users(session, name=payload.email):
+        raise HTTPException(
+            status_code=400, detail="user with same name already exists"
+        )
+    user = await crud.create_user(
+        session, payload.name, payload.email, payload.password
+    )
 
     return schemas.GetOwnUserResponse(**vars(user))

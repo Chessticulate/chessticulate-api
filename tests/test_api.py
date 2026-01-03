@@ -861,6 +861,13 @@ class TestAcceptChallenge:
         challenge = accept_resp.json()
         assert challenge["game_id"] is not None
 
+        # try getting challenge again, should fail
+        bad_accept = await client.post(
+            f"/challenges/2/accept",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert bad_accept.status_code == 404
+
 
 class TestCancelChallenge:
     @pytest.mark.asyncio
