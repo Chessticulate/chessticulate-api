@@ -788,6 +788,18 @@ class TestCreateChallenge:
 
         assert response.status_code == 201
 
+        res = await client.get(
+            "/challenges?requester_id=1",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert res.status_code == 200
+        assert len(res.json()) == 1
+
+        challenge = res.json()[0]
+        assert challenge["requester_id"] == 1
+        assert challenge["requester_username"] == "fakeuser1"
+
 
 class TestGetChallenges:
     @pytest.mark.asyncio
@@ -808,14 +820,14 @@ class TestGetChallenges:
         self, client, token, restore_fake_data_after
     ):
         response = await client.get(
-            "/challenges?requester_id=1", headers={"Authorization": f"Bearer {token}"}
+            "/challenges?requester_id=3", headers={"Authorization": f"Bearer {token}"}
         )
         challenges = response.json()
         assert len(challenges) == 1
 
         challenge = challenges[0]
-        assert challenge["requester_id"] == 1
-        assert challenge["requester_username"] == "fakeuser1"
+        assert challenge["requester_id"] == 3
+        assert challenge["requester_username"] == "fakeuser3"
         assert challenge["status"] == "PENDING"
         assert challenge["fulfilled_by"] is None
         assert challenge["game_id"] is None
@@ -841,8 +853,17 @@ class TestAcceptChallenge:
         client,
         token,
     ):
+        # create challenge
+        challenge = await client.post(
+            "/challenges",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert challenge.status_code == 201
+        challenge_id = challenge.json()["id"]
+
+        # accept my own challenge, should fail
         accept_resp = await client.post(
-            f"/challenges/1/accept",
+            f"/challenges/{challenge_id}/accept",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert accept_resp.status_code == 400
@@ -897,8 +918,15 @@ class TestCancelChallenge:
     async def test_cancel_challenge_succeeds(
         self, client, token, restore_fake_data_after
     ):
+        challenge = await client.post(
+            "/challenges",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert challenge.status_code == 201
+        challenge_id = challenge.json()["id"]
+
         cancel_resp = await client.post(
-            f"/challenges/1/cancel",
+            f"/challenges/{challenge_id}/cancel",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert cancel_resp.status_code == 200
