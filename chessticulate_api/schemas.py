@@ -191,7 +191,8 @@ class GetGameResponse(BaseModel):
     game_type: str
     date_started: datetime
     last_active: datetime | None = None
-    invitation_id: int
+    invitation_id: int | None = None
+    challenge_id: int | None = None
     white: int
     black: int
     white_username: str
