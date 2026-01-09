@@ -12,6 +12,7 @@ dependencies = [
     "pyjwt~=2.10",
     "asyncpg==0.31.0",
     "redis~=7.1",
+    "prometheus-fastapi-instrumentator~=7.0",
 ]
 
 [build-system]
