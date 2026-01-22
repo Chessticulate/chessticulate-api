@@ -69,6 +69,7 @@ class CreateChallengeResponse(BaseModel):
     )
     created_at: datetime
     requester_id: int
+    requester_username: str
     game_type: str
     status: str
 
@@ -225,7 +226,8 @@ class DoMoveResponse(BaseModel):
     )
     game_type: str
     date_started: datetime
-    invitation_id: int
+    invitation_id: int | None = None
+    challenge_id: int | None = None
     last_active: datetime | None = None
     white: int
     black: int

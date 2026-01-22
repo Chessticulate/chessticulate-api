@@ -452,14 +452,25 @@ async def create_challenge(
     game_type: models.GameType = models.GameType.CHESS,
 ) -> models.ChallengeRequest:
     """Create challenge request"""
-    challenge = models.ChallengeRequest(
-        requester_id=user_id,
-        game_type=game_type,
-    )
+
+    challenge = models.ChallengeRequest(requester_id=user_id, game_type=game_type)
     session.add(challenge)
     await session.flush()
-    await session.refresh(challenge)
-    return challenge
+
+    requester = aliased(models.User)
+    stmt = (
+        select(
+            models.ChallengeRequest,
+            requester.name.label("requester_username"),
+        )
+        .join(requester, models.ChallengeRequest.requester_id == requester.id_)
+        .where(models.ChallengeRequest.id_ == challenge.id_)
+    )
+
+    challenge_obj, requester_username = (await session.execute(stmt)).one()
+    challenge_obj.requester_username = requester_username
+
+    return challenge_obj
 
 
 async def get_challenges(
