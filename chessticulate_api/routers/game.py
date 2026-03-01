@@ -100,6 +100,7 @@ async def move(
     status = response["status"]
     states = response["states"]
     fen = response["fen"]
+
     whomst = game.white if game.whomst == game.black else game.black
 
     updated_game = await crud.do_move(

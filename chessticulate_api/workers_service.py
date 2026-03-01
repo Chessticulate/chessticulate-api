@@ -19,7 +19,7 @@ class ClientRequestError(Exception):
         self.detail = detail
 
 
-async def do_move(fen: str, move: str, states: dict[str, str]):
+async def do_move(fen: str, move: str, states: dict[str, int]):
     """do move request to chess-workers service"""
     client = httpx.AsyncClient()
     try:
@@ -31,13 +31,7 @@ async def do_move(fen: str, move: str, states: dict[str, str]):
             return response.json()
 
         if 400 <= response.status_code < 500:
-            if response.json()["message"] in [
-                "invalid move",
-                "move puts player in check",
-                "player is still in check",
-                "the game is already over",
-            ]:
-                raise ClientRequestError(response.json())
+            raise ClientRequestError(response.json())
 
         raise ServerRequestError(response.json())
 

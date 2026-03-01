@@ -620,6 +620,7 @@ class TestGetGames:
             headers={"Authorization": f"Bearer {token}"},
         )
         json_obj = response.json()
+        print("IS STATES INCLUDED?", json_obj)
 
         assert response.status_code == 200
         assert len(response.json()) == 2
