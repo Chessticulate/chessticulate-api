@@ -4,9 +4,10 @@ import importlib.metadata
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -87,3 +88,9 @@ async def signup(
     )
 
     return schemas.GetOwnUserResponse(**vars(user))
+
+
+@app.get("/metrics")
+def metrics():
+    """Prometheus metrics for Grafana dashboards"""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
