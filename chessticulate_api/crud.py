@@ -359,6 +359,29 @@ async def get_games(
 
     return games
 
+def calculate_elo(winner_elo: int, loser_elo: int, winner:bool=False):
+    delta = (loser_elo- winner_elo) 
+    #expected win probability for player 1
+    E1 = 1/(1+10**((delta)/(400)))
+    #expected win probability for player 2
+    E2 = 1-E1
+    print(f"player 1 expected win probability: {E1}")
+    print(f"player 2 expected win probability: {E2}")
+    
+    if winner:
+        winner_new_elo = winner_elo + 20*(1 - E1)
+        loser_new_elo = loser_elo - 20*(1 - E1)
+        print(f"winner's new elo: {winner_new_elo}")
+        print(f"loser's new elo: {loser_new_elo}")
+    else:
+        winner_new_elo = winner_elo + 20*(.5 - E1)
+        loser_new_elo = loser_elo + 20*(.5 - E2)
+        print(f"player 1 new elo: {winner_new_elo}") 
+        print(f"player 2 new elo: {loser_new_elo}") 
+   
+    return (winner_new_elo, loser_new_elo) 
+
+        
 
 # pylint: disable=too-many-arguments, disable=too-many-positional-arguments
 async def do_move(
@@ -394,8 +417,22 @@ async def do_move(
             or status in models.GameResult.RESIGNATION
             or status in models.GameResult.TIMEOUT
         ):
-            winner = user_id
 
+            score = 1
+            winner = user_id
+        else: 
+            score = 0.5
+
+        game = await get_games(session, id_)
+        white_id = game[0].white
+        black_id = game[0].black
+
+        white = get_users(session, white_id)
+        black = get_users(session, black_id)
+
+        #calculate_elo(white.rating, black.rating, score):
+        #need a way to get user elo, then make sure to pass the winner's elo as the first parameter of the function
+             #   pass
     else:
         # status is either MOVEOK or CHECK if its not in GameResult
         is_active = True

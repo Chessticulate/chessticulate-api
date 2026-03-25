@@ -606,3 +606,26 @@ class TestCancelChallenge:
         rows = await crud.get_challenges(session, id_=challenge.id_, limit=1)
         assert len(rows) == 1
         assert rows[0].status == models.ChallengeRequestStatus.CANCELLED
+
+def test_calculate_elo():
+    #upset win
+    new_elo1, new_elo2 = crud.calculate_elo(900, 1200, True)
+    assert new_elo1 == 916.9804088557735
+    assert new_elo2 == 1183.0195911442265
+    #predictable win
+    new_elo1, new_elo2 = crud.calculate_elo(1200, 900, True)
+    assert new_elo1 == 1203.0195911442265
+    assert new_elo2 == 896.9804088557736
+    #50-50 win
+    new_elo1, new_elo2 = crud.calculate_elo(900, 900, True)
+    assert new_elo1 == 910.0
+    assert new_elo2 == 890.0
+    #upset tie
+    new_elo1, new_elo2 = crud.calculate_elo(900, 1200, False)
+    assert new_elo1 == 906.9804088557736
+    assert new_elo2 == 1193.0195911442265
+    #50-50 tie
+    new_elo1, new_elo2 = crud.calculate_elo(1200, 1200, False)
+    assert new_elo1 == 1200.0
+    assert new_elo2 == 1200.0
+
