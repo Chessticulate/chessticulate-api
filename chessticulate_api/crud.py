@@ -361,22 +361,23 @@ async def get_games(
 
 
 def calculate_elo(winner_elo: int, loser_elo: int, score: float):
+    """calculates new player ratings after game ends"""
     delta = loser_elo - winner_elo
     # expected win probability for player 1
-    E1 = 1 / (1 + 10 ** ((delta) / (400)))
+    win_prob1 = 1 / (1 + 10 ** ((delta) / (400)))
     # expected win probability for player 2
-    E2 = 1 - E1
-    print(f"player 1 expected win probability: {E1}")
-    print(f"player 2 expected win probability: {E2}")
+    win_prob2 = 1 - win_prob1
+    print(f"player 1 expected win probability: {win_prob1}")
+    print(f"player 2 expected win probability: {win_prob2}")
 
     if score == 1:
-        winner_new_elo = winner_elo + 20 * (1 - E1)
-        loser_new_elo = loser_elo - 20 * (1 - E1)
+        winner_new_elo = winner_elo + 20 * (1 - win_prob1)
+        loser_new_elo = loser_elo - 20 * (1 - win_prob1)
         print(f"winner's new elo: {winner_new_elo}")
         print(f"loser's new elo: {loser_new_elo}")
     else:
-        winner_new_elo = winner_elo + 20 * (0.5 - E1)
-        loser_new_elo = loser_elo + 20 * (0.5 - E2)
+        winner_new_elo = winner_elo + 20 * (0.5 - win_prob1)
+        loser_new_elo = loser_elo + 20 * (0.5 - win_prob2)
         print(f"player 1 new elo: {winner_new_elo}")
         print(f"player 2 new elo: {loser_new_elo}")
 
@@ -461,8 +462,7 @@ async def do_move(
         )
 
         await session.execute(stmt)
-        # need a way to get user elo, then make sure to pass the winner's elo as the first parameter of the function
-        #   pass
+
     else:
         # status is either MOVEOK or CHECK if its not in GameResult
         is_active = True
