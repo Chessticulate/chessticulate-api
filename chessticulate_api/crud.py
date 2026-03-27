@@ -359,29 +359,29 @@ async def get_games(
 
     return games
 
-def calculate_elo(winner_elo: int, loser_elo: int, winner:bool=False):
-    delta = (loser_elo- winner_elo) 
-    #expected win probability for player 1
-    E1 = 1/(1+10**((delta)/(400)))
-    #expected win probability for player 2
-    E2 = 1-E1
+
+def calculate_elo(winner_elo: int, loser_elo: int, score: float):
+    delta = loser_elo - winner_elo
+    # expected win probability for player 1
+    E1 = 1 / (1 + 10 ** ((delta) / (400)))
+    # expected win probability for player 2
+    E2 = 1 - E1
     print(f"player 1 expected win probability: {E1}")
     print(f"player 2 expected win probability: {E2}")
-    
-    if winner:
-        winner_new_elo = winner_elo + 20*(1 - E1)
-        loser_new_elo = loser_elo - 20*(1 - E1)
+
+    if score == 1:
+        winner_new_elo = winner_elo + 20 * (1 - E1)
+        loser_new_elo = loser_elo - 20 * (1 - E1)
         print(f"winner's new elo: {winner_new_elo}")
         print(f"loser's new elo: {loser_new_elo}")
     else:
-        winner_new_elo = winner_elo + 20*(.5 - E1)
-        loser_new_elo = loser_elo + 20*(.5 - E2)
-        print(f"player 1 new elo: {winner_new_elo}") 
-        print(f"player 2 new elo: {loser_new_elo}") 
-   
-    return (winner_new_elo, loser_new_elo) 
+        winner_new_elo = winner_elo + 20 * (0.5 - E1)
+        loser_new_elo = loser_elo + 20 * (0.5 - E2)
+        print(f"player 1 new elo: {winner_new_elo}")
+        print(f"player 2 new elo: {loser_new_elo}")
 
-        
+    return (winner_new_elo, loser_new_elo)
+
 
 # pylint: disable=too-many-arguments, disable=too-many-positional-arguments
 async def do_move(
@@ -420,19 +420,49 @@ async def do_move(
 
             score = 1
             winner = user_id
-        else: 
+        else:
             score = 0.5
 
         game = await get_games(session, id_)
         white_id = game[0].white
         black_id = game[0].black
 
-        white = get_users(session, white_id)
-        black = get_users(session, black_id)
+        white = (await get_users(session, white_id, lock_rows=True))[0]
+        black = (await get_users(session, black_id, lock_rows=True))[0]
 
-        #calculate_elo(white.rating, black.rating, score):
-        #need a way to get user elo, then make sure to pass the winner's elo as the first parameter of the function
-             #   pass
+        winner_user = black
+        loser_user = white
+        if winner == white_id:
+            winner_user = white
+            loser_user = black
+
+        winner_elo, loser_elo = calculate_elo(
+            winner_user.rating, loser_user.rating, score
+        )
+
+        white_elo = winner_elo
+        black_elo = loser_elo
+        if winner == white_id:
+            white_elo = loser_elo
+            black_elo = winner_elo
+
+        stmt = (
+            update(models.User)
+            .where(models.User.id_ == white_id)
+            .values(rating=white_elo)
+        )
+
+        await session.execute(stmt)
+
+        stmt = (
+            update(models.User)
+            .where(models.User.id_ == black_id)
+            .values(rating=black_elo)
+        )
+
+        await session.execute(stmt)
+        # need a way to get user elo, then make sure to pass the winner's elo as the first parameter of the function
+        #   pass
     else:
         # status is either MOVEOK or CHECK if its not in GameResult
         is_active = True

@@ -85,6 +85,7 @@ class User(Base):  # pylint: disable=too-few-public-methods
     losses: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
     rating: Mapped[int] = mapped_column(Integer, server_default="800", nullable=False)
 
+
 class Invitation(Base):  # pylint: disable=too-few-public-methods
     """Invitation SQL Model"""
 
